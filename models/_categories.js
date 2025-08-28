@@ -24,6 +24,10 @@ const Category=DB.define("Category",{
             key:"uuid"
         }
     },
+    display_name:{
+        type:DataTypes.STRING,
+        allowNull:false,
+    },
     name:{
         type:DataTypes.STRING,
         allowNull:false,
