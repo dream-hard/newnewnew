@@ -46,13 +46,14 @@ function generateSlug(text) {
 // }
 exports.create = async (req, res) => {
   try {
-    const {parentId=null,name,description}=req.body;
+    const {parentId=null,name,description,display_name}=req.body;
     let {slug}=req.body;
     if(!slug || slug==="")
     slug=generateSlug(name);
 
     const category = await Category.create({
       parent_category_id:parentId,
+      display_name,
       name,
       slug,
       description:description
@@ -89,8 +90,9 @@ exports.update = async (req, res) => {
     let slug;
     const old_category=await Category.findByPk(id);
     if(!old_category) return res.status(404).json({error:"Not Found"});
-    let {name,description,parentId}=req.body;
+    let {name,description,parentId,display_name}=req.body;
     if(!name)name=old_category.name;
+    if(!display_name)display_name=old_category.display_name,
     slug=generateSlug(name);
     if(!parentId)parentId=old_category.parentId;
     if(!description)description=old_category.description;
@@ -102,6 +104,7 @@ exports.update = async (req, res) => {
       name,
       slug,
       description:description,
+      display_name
     }, {
       where: { uuid: id },
     });
@@ -374,10 +377,10 @@ exports.justgetall=async(req,res)=>{
 
 exports.addcategory=async(req,res)=>{
   try {
-    const {parent_id,name,description,softdeleted=false}=req.body;
-    if(!parent_id || !name )return res.status(400).json({error: "you should send each parent_category_id and name",msg:""});
+    const {parent_id,name,description,softdeleted=false,display_name}=req.body;
+    if(!parent_id || !name  ||!display_name)return res.status(400).json({error: "you should send each parent_category_id and name",msg:""});
     const slug=generateSlug(name);
-    const add=await Category.create({parent_category_id:parent_id,name,slug,description,softdeleted});
+    const add=await Category.create({parent_category_id:parent_id,name,slug,description,softdeleted,display_name});
     req.status(200).json({succes:true,msg:"the category was added successfully"});
   } catch (error) {
     res.status(400).json({error:error.message})
@@ -386,12 +389,13 @@ exports.addcategory=async(req,res)=>{
 
 exports.updatedcategory=async(req,res)=>{
   try {
-    const {id,parent_id,name,description,softdeleted}=req.body;
+    const {id,parent_id,name,description,softdeleted,display_name}=req.body;
     if(!id)return res.status(400).json({error:"you should send the uuid with the req ",msg:""});
     let optinos={};
     if(parent_id)optinos.parent_category_id=parent_id;
     if(name){optinos.name=name;optinos.slug=generateSlug(name)}
     if(description)optinos.description=description;
+    if(display_name)optinos.display_name=display_name;
     if(softdeleted!==null || softdeleted!==undefined)optinos.softdeleted=softdeleted;
     const [update]=await Category.update(optinos,{where:{uuid:id}});
     if(!update)return res.status(400).json({error:"the category was not updated please try again",msg:""});
@@ -447,12 +451,13 @@ exports.filtercategories=async(req,res)=>{
 }
 exports.searchincategories=async(req,res)=>{
   try {
-    const{id,parent_id,name,slug,description,softdeleted,page=1,limit=10,orderby}=req.body;
+    const{id,display_name,parent_id,name,slug,description,softdeleted,page=1,limit=10,orderby}=req.body;
     let where={};
-    if(id)where.uuid={[Op.like]:`%${id}%`};;
+    if(id)where.uuid={[Op.like]:`%${id}%`};
     if(parent_id)where.parent_category_id={[Op.like]:`%${parent_id}%`};
-    if(name)where.name={[Op.like]:`%${name}%`};;
-    if(slug)where.slug={[Op.like]:`%${slug}%`};;
+    if(name)where.name={[Op.like]:`%${name}%`};
+    if(slug)where.slug={[Op.like]:`%${slug}%`};
+        if(display_name)where.display_name={[Op.like]:`%${display_name}%`};
     if(description)where.description={[Op.like]:`%${description}%`};
     if(softdeleted!==null|| softdeleted!==undefined)where.softdeleted=softdeleted;
     page=parseInt(page);
