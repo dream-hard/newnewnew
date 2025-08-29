@@ -24,4 +24,5 @@ router.get('/iflogin',varifay,UserController.iflogin);
 router.delete('/logout',varifay,UserController.logout);
 router.post('/aslfasdlfjadsfwehupcvxz',UserController.adminsingup);
 router.get('/refresh',varifay,UserController.refresh)
+router.get('/user/justgetall',UserController.justgetall)
 module.exports=router

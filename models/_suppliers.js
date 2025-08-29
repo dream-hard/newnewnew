@@ -51,6 +51,6 @@ const Supplier=DB.define('Supplier',{
     },
 
 },
-{freezeTableName:true,timestamps:true,tableName:'Suppliers'});
+{freezeTableName:true,timestamps:true,tableName:'suppliers'});
 
 module.exports=Supplier;

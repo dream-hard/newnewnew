@@ -294,7 +294,7 @@ exports.login= async (req,res)=>{
 
 ///////////////////////////////////////////////////////////////////////////////////////
 exports.iflogin=async(req,res,next)=>{
-
+  console.log("ffffffffffffffffffffffffffffffffffffffffffffffffff")
         const newtoken=jwt.sign({email:req.user.email,id:req.user.id,hashpassword:req.user.hashpassword},process.env.SECRET_KEY,{expiresIn:"5s"});
           return  res.status(200).json({authtoken:newtoken});
     

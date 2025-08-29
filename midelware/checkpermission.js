@@ -1,6 +1,8 @@
 function checkPermission(requiredRoles) {
     return (req, res, next) => {
-        const userRole = req.user.role.type; // assuming you add user info in req.user after login
+            console.log(req.user)
+
+        const userRole = req.user.role.uuid; // assuming you add user info in req.user after login
         if (requiredRoles.includes(userRole)) {
             return next();
         }

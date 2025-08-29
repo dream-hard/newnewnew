@@ -2,7 +2,6 @@ const path = require("path");
 const fs = require("fs");
 const Category = require('../models/_categories.js');
 
-const Product = require('../models/_products.js');
 const { getAllCategoryIds } = require('./categoryController.js');
 const{Product,Product_attribute, Currency, Product_image, Attribute_option, Attribute_type, Product_condition, Product_statu, User, }=require('../models');
 const { Op,Sequelize } = require('sequelize');
@@ -821,22 +820,22 @@ exports.updateProductWithImages = async (req, res) => {
 //////4 
 exports.createProductWithImages = async (req, res) => {
   try {
-    const {
-      cat, user, status, condition, currency, title, quantity,
+    let {
+      category_id, user=req.user.id, status_id, condition_id, currency, title, quantity,
       active_name, active_number, active_prcie, available, featured,
       upcoming, negotiable, warranty, warranty_peroid, latest,
       discount, price, original_price, metadata,description,attribute_option_ids=[]
     } = req.body;
-
-    if (!title || !cat || !user) return res.status(400).json({ message: "Missing required product fields" });
-
+    
+    if (!title || !category_id ) return res.status(400).json({ message: "Missing required product fields" });
+    
     // 1️⃣ Create the product first
     const slug = generateSlug(title);
     const product = await Product.create({
-      category_id: cat,
+      category_id: category_id,
       user_id: user,
-      status_id: status,
-      condition_id: condition,
+      status_id: status_id,
+      condition_id: condition_id,
       currency_id: currency,
       title,
       slug,
@@ -874,7 +873,7 @@ exports.createProductWithImages = async (req, res) => {
           product_id: product.uuid,
           image_type: req.body[`image_type_${f.originalname}`] || 'sup',
           filename: f.publicUrl,
-           disk_filename: f.filename,
+          disk_filename: f.filename,
         }))
       );
       let createdoptions;
@@ -933,7 +932,7 @@ exports.justgettheall=async(req,res)=>{
 
 exports.filterproducts=async(req,res)=>{
   try {
-    const {
+    let {
       page=1,
       limit=10,
       orderby,
@@ -967,8 +966,9 @@ exports.filterproducts=async(req,res)=>{
       includedeletedcategory,
       onlyDeletedCategory ,
       softdelete,
-    attribute_option_ids:[]
+    attribute_option_ids=[]
     }=req.body;
+    console.log("gggggggggggggggggggggggggggggggggggggggggg")
     page=parseInt(page);
     limit=parseInt(limit);
     const offset=(page-1)*limit;
@@ -1115,27 +1115,33 @@ if (softdelete !== undefined) where.softdelete = softdelete;
   ];
 
   // إضافة الـ attributes filter إذا موجود
-  if (attribute_option_ids.length > 0) {
-    includeOptions.push({
-      model: Product_attribute,
-      required: true,
-      where: {
-        attribute_option_id: { [Op.in]: attribute_option_ids }
-      },
-      attributes: []
-    });
+let matchedIds = null;
+if (attribute_option_ids && attribute_option_ids.length > 0) {
+  const idsRows = await Product_attribute.findAll({
+    attributes: [],
+    as:"attributes",
+    where: { attribute_option_id: { [Op.in]: attribute_option_ids } },
+    group: ['product_id'],
+    having: Sequelize.literal(`COUNT(DISTINCT attribute_option_id) = ${attribute_option_ids.length}`),
+    raw: true
+  });
+  matchedIds = idsRows.map(r => r.product_uuid);
+  if (matchedIds.length === 0) {
+    return res.status(200).json({ products: [], total: 0, currentPage: page, totalPages: 0 });
   }
+  // ضيف شرط للـ where ليجلب المنتجات اللي بترجعهم matchedIds
+  where.uuid = { [Op.in]: matchedIds };
+}
 
     const queryOptions = {
     where,
     include: includeOptions,
-    group: ['Product.uuid'],
     order,
     limit,
     offset,
-    subQuery: false
-    ,raw:true,
-    nest:true
+    subQuery: false,
+      distinct: true
+    ,raw:false
   };
   if (attribute_option_ids.length > 0) {
     queryOptions.having = Sequelize.literal(
@@ -1165,7 +1171,7 @@ exports.justtheproduct = async (req, res) => {
       include: [
         { model: Category, attributes: ["uuid", "name", "slug"] },
         { model: Currency, attributes: ["currency_iso", "symbol"] },
-        { model: Product_image, attributes: ["filename", "image_type"] },
+        { model: Product_image,as:"images", attributes: ["filename", "image_type"] },
         { model: User, attributes: ["username", "email", "phone_number"] },
         {model : Product_attribute, attributes:['isfilteractive',"id"],include:[{model:Attribute_option ,attributes:["id","name"],include:[{model:Attribute_type,attributes:["id",'name']}]}] }
               ],
@@ -1202,17 +1208,17 @@ exports.justalltheproduct = async (req, res) => {
       include: [
         { model: Category, attributes: ["uuid", "name", "slug","softdelete"] },
         { model: Currency, attributes: ["currency_iso", "symbol","name"] },
-        { model: Product_image, attributes: ["id","filename", "image_type"] },
+        { model: Product_image, attributes: ["id","filename", "image_type","disk_filename"] },
         { model: User, attributes: ["name","username","role_id","status_id", "email", "phone_number"] }
         ,{model: Product_condition},{model: Product_statu}
-        ,{model : Product_attribute, attributes:['isfilteractive',"id"],include:[{model:Attribute_option ,attributes:["id","name"],include:[{model:Attribute_type,attributes:["id",'name']}]}] }
+        ,{model : Product_attribute, attributes:['is_filteractive',"id"],include:[{model:Attribute_option ,attributes:["id","name"],include:[{model:Attribute_type,attributes:["id",'name']}]}] }
 
       ],
-      raw:true,
+      raw:false,
       nest:true,
     });
     if (!product) return res.status(404).json({ error: "Product not found" ,msg:""});
-    const productData = product.toJSON();
+    const productData = product;
     res.json({
       succes: true,
       product: productData,

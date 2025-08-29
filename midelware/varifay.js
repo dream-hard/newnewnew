@@ -6,7 +6,7 @@ const jwt=require("jsonwebtoken");
 require('dotenv').config();
 
 exports.varifay= async (req,res,next)=> {
-    console.log(req)
+    
   const retoken = req.cookies.refresh_token;
 
     console.log(retoken)
@@ -18,7 +18,6 @@ exports.varifay= async (req,res,next)=> {
                 valid=false; 
             }
             req.user=result.result;
-            console.log(req.user)
         });
         if(valid)  {     
                 const response= await User.findByPk(req.user.id);

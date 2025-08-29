@@ -13,7 +13,7 @@ const Supplier_shipment= DB.define('Supplier_shipment',
     },
     supplier_id:{
 
-        type:DataTypes.STRING(38),
+        type:DataTypes.UUID,
         allowNull:false,
         
         validate:{
@@ -59,6 +59,6 @@ const Supplier_shipment= DB.define('Supplier_shipment',
         }
     }
   }
-    ,{freezeTableName:true,timestamps:true,tableName:"Supplier_shipments"})
+    ,{freezeTableName:true,timestamps:true,tableName:"supplier_shipments"})
 
     module.exports=Supplier_shipment;

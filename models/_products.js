@@ -20,7 +20,7 @@ const Product=DB.define('Product',{
         type:DataTypes.UUID,
         allowNull:false,
         validate:{
-            isUUID:true,
+
             notEmpty:true,
 
         },

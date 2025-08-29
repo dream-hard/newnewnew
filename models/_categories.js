@@ -27,6 +27,7 @@ const Category=DB.define("Category",{
     display_name:{
         type:DataTypes.STRING,
         allowNull:false,
+        defaultValue:""
     },
     name:{
         type:DataTypes.STRING,

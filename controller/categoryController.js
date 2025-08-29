@@ -193,7 +193,9 @@ const buildleafids=(map,rootId =null)=>{
   const stack   = [rootId];
   while (stack.length) {
     const id   = stack.pop();
-    const kids = map[id] || [];
+    let kids;
+    if(id===null){kids =map[null]}else{ kids = map[id.uuid] || [];}
+    
     if (kids.length === 0) {
       leafIds.add(id);
     } else {
@@ -310,9 +312,10 @@ const childrenMap = allCats.reduce((map, cat) => {
 
 exports.getAllCategoryleafIds=async (req,res)=>{
   try {
-      const {id}=req.body;
+      let {id}=req.body;
+      if(id===undefined || id===null)id=null;
        const allCats = await Category.findAll({
-    attributes: ['uuid', 'parent_category_id',"name", 'slug'],
+    attributes: ['uuid', 'parent_category_id',"name","display_name", 'slug'],
     raw: true
   });
 const childrenMap = allCats.reduce((map, cat) => {
@@ -320,15 +323,17 @@ const childrenMap = allCats.reduce((map, cat) => {
   if (!map[pid]) {                
     map[pid] = [];
   }
-  map[pid].push(cat.uuid);
+  map[pid].push(cat);
   return map;
 }, {});
+console.log(childrenMap,"dddddddddddddddddddddddddddddddd")
 
    const leafIds=buildleafids(childrenMap,id);
    if(!leafIds)return res.status(404).json({err:'not found'});
    res.status(200).json(leafIds);
 
   } catch (error) {
+      
             res.status(500).json({ error: error.message });
 
   }
@@ -366,7 +371,7 @@ exports.getuntilrootid=async(req,res)=>{
 }
 exports.justgetall=async(req,res)=>{
   try {
-    const categories=await Category.findAll({attributes:["uuid","name"],raw:true });
+    const categories=await Category.findAll({raw:true });
 
     res.status(200).json (categories);
   } catch (error) {

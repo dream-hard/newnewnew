@@ -67,11 +67,11 @@ Coupon.belongsToMany(User, { through: User_coupon, foreignKey: 'coupon_id', othe
 
 Attribute_option.belongsTo(Attribute_type, {
   foreignKey: 'attribute_type_id',
-  as: 'AttributeType'
+  
 });
 Attribute_type.hasMany(Attribute_option, {
   foreignKey: 'attribute_type_id',
-  as: 'Attributeoptions'
+  
 });
 //////////////////////////////////////////////////
 Category.belongsTo(Category, {
@@ -127,12 +127,12 @@ Product_condition.hasMany(Product, { foreignKey: 'condition_id' });
 Product.belongsTo(Currency, { foreignKey: 'currency_id' });
 Currency.hasMany(Product, { foreignKey: 'currency_id' });
 ////////////////////////////////////////////////////
-Product.hasMany(Product_image, { foreignKey: 'product_id', as: 'images' });
+Product.hasMany(Product_image, { foreignKey: 'product_id', });
 Product_image.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 /////////////////////////////////////////////////
 Product_attribute.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
-Product.hasMany(Product_attribute, { foreignKey: 'product_id', as: 'attributes' });
-Product_attribute.belongsTo(Attribute_option, { foreignKey: 'attribute_option_id', as: 'attributeOption' });
+Product.hasMany(Product_attribute, { foreignKey: 'product_id',  });
+Product_attribute.belongsTo(Attribute_option, { foreignKey: 'attribute_option_id', });
 Attribute_option.hasMany(Product_attribute, { foreignKey: 'attribute_option_id', as: 'productAttributes' });
 ///////////////////////////////////////////////////////
 User.hasMany(Order, { foreignKey: 'user_id', as: 'orders' });

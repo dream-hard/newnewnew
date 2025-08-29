@@ -1,6 +1,6 @@
 const sequlize = require('sequelize');
 const {DB} =require('../config/config.js');
-const {DataTypes}=sequlize;
+const {DataTypes,Sequelize}=sequlize;
 const Currency = require('./_currencies.js');
 
 const Exchange_rate=DB.define("Exchange_rate",{
@@ -41,7 +41,8 @@ const Exchange_rate=DB.define("Exchange_rate",{
     ,dateofstart:{
         type:DataTypes.DATEONLY,
         allowNull:false,
-        unique:true,
+          defaultValue:  new Date()      ,  // or some valid date
+
         validate:{
             notEmpty:true,
             notNull:true
