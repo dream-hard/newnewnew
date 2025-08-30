@@ -1096,6 +1096,14 @@ if (softdelete !== undefined) where.softdelete = softdelete;
     }
 
     const includeOptions = [
+    {model:Product_condition,
+      required:true,
+      attributes:['condition']
+    },
+    {model:Product_statu,
+      required:true,
+      attributes:['statu']
+    },
     {
       model: Category,
       required: true,

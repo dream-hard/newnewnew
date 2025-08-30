@@ -19,7 +19,7 @@ var DB = createSequelizeInstance();
     {
       host: process.env.DB_HOST,
       port: process.env.PORTDB|| 3306,
-      dialect: process.env.dialect,
+      dialect: process.env.DIALECT,
       
     }
   );

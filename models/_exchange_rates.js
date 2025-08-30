@@ -31,7 +31,7 @@ const Exchange_rate=DB.define("Exchange_rate",{
         }
     },
     exchange_rate:{
-        type:DataTypes.DECIMAL(8,2),
+        type: DataTypes.DECIMAL(15,8),
         allowNull:false,
         validate:{
             notEmpty:true,
