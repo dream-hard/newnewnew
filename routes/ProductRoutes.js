@@ -15,7 +15,8 @@ router.get("/product/justgettheall",ProductController.justgettheall)
 router.post('/prodcut/justgettheproduct',ProductController.justtheproduct)
 router.post('/product/justgetalltheproduct',ProductController.justalltheproduct)
 router.post("/product/filterproducts",ProductController.filterproducts)
+router.post('/product/justgettheproudctbyslug',ProductController.justgettheproudctbyslug)
 router.post('/product/create/createproductwithimages',varifay,checkPermission(["admin","super_admin","Owner"]),upload.array('files',14),autoProcessImages,ProductController.createProductWithImages);
-router.patch('/product/update/updateproductwithimages',upload.array('files',14),autoProcessImages,ProductController.updateProductWithImages);
-router.delete('/product/delete/deleteProduct',varifay,checkPermission(['super_admin',"Owner"]),ProductController.deleteProduct);
+router.patch('/product/update/updateproductwithimages',varifay,checkPermission(["admin","super_admin","Owner"]),upload.array('files',14),autoProcessImages,ProductController.updateProductWithImages);
+router.delete('/product/delete/deleteProduct',varifay,checkPermission(["admin","super_admin","Owner"]),ProductController.deleteProduct);
 module.exports=router;

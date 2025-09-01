@@ -19,7 +19,7 @@ const upload = multer({
     if (extname && mimetype) return cb(null, true);
     cb(new Error('Only image files are allowed'));
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+limits: { fileSize: 20 * 1024 * 1024 } // 12MB
 });
 
 // ensure uploads dir exists

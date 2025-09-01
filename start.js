@@ -27,6 +27,7 @@ const Product_attribute_routes=require('./routes/ProductAttriubteRoutes');
 const Product_routes=require("./routes/ProductRoutes");
 const Product_status_routes=require("./routes/ProductStatusRoutes");
 const Product_condition_routes=require("./routes/ProductConditionRoutes");
+const path = require('path');
 
 
 let waitlist = [];
@@ -62,6 +63,9 @@ const corsoption = {
         callback(null, true);
   }
 };
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+
 app.use(
   express_session({
     secret: process.env.SECRET,

@@ -21,7 +21,7 @@ router.get('/category/getuntilrootid',CategoryController.getuntilrootid)
 router.get('/category/justgetall',CategoryController.justgetall)
 router.post('/category/getallcategoryleafids',CategoryController.getAllCategoryleafIds)
 router.post('/category/searchincategories',CategoryController.searchincategories)
-router.post('/categoryfiltercategories',CategoryController.filtercategories);
+router.post('/category/filtercategories',CategoryController.filtercategories);
 router.post('/category/create/create',varifay,checkPermission(["admin","super_admin","Owner"]),CategoryController.create)
 router.post('/category/create/addcategory',varifay,checkPermission(["admin","super_admin","Owner"]),CategoryController.addcategory)
 router.patch('/category/update/update',varifay,checkPermission(["admin","super_admin","Owner"]),CategoryController.update)

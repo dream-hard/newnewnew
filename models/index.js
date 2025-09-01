@@ -115,8 +115,8 @@ Product.hasMany(Review, { foreignKey: 'product_id', as: 'Reviews' });
 Product.belongsTo(User, { foreignKey: 'user_id' });
 User.hasMany(Product, { foreignKey: 'user_id' });
 
-Product.belongsTo(Category, { foreignKey: 'category_id' });
-Category.hasMany(Product, { foreignKey: 'category_id' });
+Product.belongsTo(Category, { foreignKey: 'category_id', targetKey: 'uuid' });
+Category.hasMany(Product, { foreignKey: 'category_id', sourceKey: 'uuid' });
 
 Product.belongsTo(Product_statu, { foreignKey: 'status_id' });
 Product_statu.hasMany(Product, { foreignKey: 'status_id' });

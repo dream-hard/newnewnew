@@ -28,7 +28,6 @@ exports.varifay= async (req,res,next)=> {
         return res.status(406).json({msg:"Unauthreized",err:""});
         }
     } catch (error) {
-        console.log(error);
         return res.status(406).json({msg:"Unauthreized",err:""});
     }
 }

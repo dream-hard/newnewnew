@@ -72,14 +72,26 @@ const orderMapM = {
   "updated-asc": [["updatedAt", "ASC"]],
   "updated-desc": [["updatedAt", "DESC"]],
 };
+function arabicToLatin(text) {
+  const map = {
+    'ا':'a','أ':'a','إ':'i','آ':'aa','ب':'b','ت':'t','ث':'th',
+    'ج':'j','ح':'h','خ':'kh','د':'d','ذ':'dh','ر':'r','ز':'z',
+    'س':'s','ش':'sh','ص':'s','ض':'d','ط':'t','ظ':'z','ع':'a',
+    'غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n',
+    'ه':'h','و':'w','ي':'y','ء':'a','ئ':'a','ؤ':'a','ى':'a',
+    // diacritics strip
+    'ً':'','ٌ':'','ٍ':'','َ':'','ُ':'','ِ':'','ّ':'','ْ':''
+  };
+  return text.split('').map(c => map[c] !== undefined ? map[c] : c).join('');
+}
 
 function generateSlug(text) {
-  return text
+  return arabicToLatin(text)          // convert Arabic to Latin
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')   // remove special characters
-    .replace(/\s+/g, '-')           // replace spaces with hyphens
-    .replace(/-+/g, '-')            // remove multiple hyphens
-    .replace(/^-+|-+$/g, '');       // trim hyphens from start and end
+    .replace(/[^a-z0-9\s-]/g, '')    // remove remaining special characters
+    .replace(/\s+/g, '-')            // replace spaces with hyphens
+    .replace(/-+/g, '-')             // remove multiple hyphens
+    .replace(/^-+|-+$/g, '');        // trim hyphens
 }
 
 exports.create = async (req, res) => {
@@ -198,7 +210,9 @@ exports.update = async (req, res) => {
 ////////////3
 exports.deleteProduct = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.query;
+
+        console.log(req.body)
 
         // 1️⃣ Find the product
         const product = await Product.findByPk(id);
@@ -716,14 +730,15 @@ Product_image
 exports.updateProductWithImages = async (req, res) => {
     try {
         const { id } = req.body;
-        const {
+        let {
             cat, user, status, condition, currency, title, quantity,
             active_name, active_number, active_prcie, available, featured,
             upcoming, negotiable, warranty, warranty_peroid, latest,
             discount, price, original_price, metadata,
-            delete_filenames = [],attributes
+            delete_filenames = [],attributes=[]
         } = req.body;
-
+        delete_filenames=JSON.parse(delete_filenames);
+        attributes=JSON.parse(attributes);
         // 1️⃣ Find the product
         const product = await Product.findByPk(id);
         if (!product) return res.status(404).json({ message: "Product not found" });
@@ -821,16 +836,17 @@ exports.updateProductWithImages = async (req, res) => {
 exports.createProductWithImages = async (req, res) => {
   try {
     let {
-      category_id, user=req.user.id, status_id, condition_id, currency, title, quantity,
+      category_id, user="08a46d31-6ddc-437d-813f-5f68d3b53a4e", status_id, condition_id, currency, title, quantity,
       active_name, active_number, active_prcie, available, featured,
       upcoming, negotiable, warranty, warranty_peroid, latest,
       discount, price, original_price, metadata,description,attribute_option_ids=[]
     } = req.body;
-    
+
     if (!title || !category_id ) return res.status(400).json({ message: "Missing required product fields" });
     
     // 1️⃣ Create the product first
     const slug = generateSlug(title);
+
     const product = await Product.create({
       category_id: category_id,
       user_id: user,
@@ -900,8 +916,7 @@ exports.createProductWithImages = async (req, res) => {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     }
-    
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ slug:req.body.title,sss:slug,error: error.message });
   }
 };
 exports.justgetall=async(req,res)=>{
@@ -931,6 +946,7 @@ exports.justgettheall=async(req,res)=>{
 
 
 exports.filterproducts=async(req,res)=>{
+  
   try {
     let {
       page=1,
@@ -968,7 +984,6 @@ exports.filterproducts=async(req,res)=>{
       softdelete,
     attribute_option_ids=[]
     }=req.body;
-    console.log("gggggggggggggggggggggggggggggggggggggggggg")
     page=parseInt(page);
     limit=parseInt(limit);
     const offset=(page-1)*limit;
@@ -1092,9 +1107,9 @@ if (softdelete !== undefined) where.softdelete = softdelete;
 
     // filter by allIds if present
     if (allIds && allIds.length > 0) {
-      categoryWhere.uuid = { [Op.in]: allIds };
+      categoryWhere.uuid= {[Op.in]:allIds}
+      where.category_id = { [Op.in]: allIds };
     }
-
     const includeOptions = [
     {model:Product_condition,
       required:true,
@@ -1106,8 +1121,8 @@ if (softdelete !== undefined) where.softdelete = softdelete;
     },
     {
       model: Category,
+      where:categoryWhere,
       required: true,
-      where: categoryWhere,
       attributes: [ 'name', 'slug',"uuid"]
     },
     {
@@ -1121,8 +1136,8 @@ if (softdelete !== undefined) where.softdelete = softdelete;
         required: false
     },
   ];
-
-  // إضافة الـ attributes filter إذا موجود
+  
+    // إضافة الـ attributes filter إذا موجود
 let matchedIds = null;
 if (attribute_option_ids && attribute_option_ids.length > 0) {
   const idsRows = await Product_attribute.findAll({
@@ -1147,18 +1162,14 @@ if (attribute_option_ids && attribute_option_ids.length > 0) {
     order,
     limit,
     offset,
-    subQuery: false,
+    subQuery:false,
       distinct: true
     ,raw:false
   };
-  if (attribute_option_ids.length > 0) {
-    queryOptions.having = Sequelize.literal(
-      `COUNT(DISTINCT "Product_attributes"."attribute_option_id") = ${attribute_option_ids.length}`
-    );
-  }
-  const { count, rows } = await Product.findAndCountAll(queryOptions);
-  if(!count || !rows)return res.status(404).json({error:"didn't found any product",msg:""});
 
+  const { count, rows } = await Product.findAndCountAll(queryOptions);
+  
+  if(!count || !rows)return res.status(404).json({error:"didn't found any product",msg:""});
   return res.status(200).json({
       products: rows,
       total: count,
@@ -1227,6 +1238,36 @@ exports.justalltheproduct = async (req, res) => {
     });
     if (!product) return res.status(404).json({ error: "Product not found" ,msg:""});
     const productData = product;
+    res.json({
+      succes: true,
+      product: productData,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+exports.justgettheproudctbyslug = async (req, res) => {
+  try {
+    const { slug } = req.body; 
+    const product = await Product.findOne({
+      where: { slug: slug},
+      include: [
+        { model: Category, attributes: ["uuid", "name", "slug","softdelete"] },
+        { model: Currency, attributes: ["currency_iso", "symbol","name"] },
+        { model: Product_image, attributes: ["id","filename", "image_type","disk_filename"] },
+        { model: User, attributes: ["name","username","role_id","status_id", "email", "phone_number"] }
+        ,{model: Product_condition},{model: Product_statu}
+        ,{model : Product_attribute, attributes:['is_filteractive',"id"],include:[{model:Attribute_option ,attributes:["id","name"],include:[{model:Attribute_type,attributes:["id",'name']}]}] }
+
+      ],
+      raw:false,
+      nest:true,
+    });
+    if (!product) return res.status(404).json({ error: "Product not found" ,msg:""});
+    const productData = product;
+    console.log(product);
     res.json({
       succes: true,
       product: productData,

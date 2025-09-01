@@ -29,11 +29,7 @@ const User=DB.define('User',{
         type:DataTypes.STRING,
         unique:true,
         allowNull:true,
-        validate:{
-            notEmpty:false,
-            notNull:false,
-
-        }
+ 
     },
     passwordhash:{
         type:DataTypes.STRING,

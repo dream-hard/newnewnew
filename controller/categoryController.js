@@ -27,15 +27,29 @@ const orderMap = {
   "updated-desc": [["updatedAt", "DESC"]],
 };
 
+function arabicToLatin(text) {
+  const map = {
+    'ا':'a','أ':'a','إ':'i','آ':'aa','ب':'b','ت':'t','ث':'th',
+    'ج':'j','ح':'h','خ':'kh','د':'d','ذ':'dh','ر':'r','ز':'z',
+    'س':'s','ش':'sh','ص':'s','ض':'d','ط':'t','ظ':'z','ع':'a',
+    'غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n',
+    'ه':'h','و':'w','ي':'y','ء':'a','ئ':'a','ؤ':'a','ى':'a',
+    // diacritics strip
+    'ً':'','ٌ':'','ٍ':'','َ':'','ُ':'','ِ':'','ّ':'','ْ':''
+  };
+  return text.split('').map(c => map[c] !== undefined ? map[c] : c).join('');
+}
 
 function generateSlug(text) {
-  return text
+  return arabicToLatin(text)          // convert Arabic to Latin
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')   // remove special characters
-    .replace(/\s+/g, '-')           // replace spaces with hyphens
-    .replace(/-+/g, '-')            // remove multiple hyphens
-    .replace(/^-+|-+$/g, '');       // trim hyphens from start and end
+    .replace(/[^a-z0-9\s-]/g, '')    // remove remaining special characters
+    .replace(/\s+/g, '-')            // replace spaces with hyphens
+    .replace(/-+/g, '-')             // remove multiple hyphens
+    .replace(/^-+|-+$/g, '');        // trim hyphens
 }
+
+
 // function buildTree(parentId = null) {
 //   const children = catMap[parentId] || [];
 
@@ -234,8 +248,9 @@ const getParentChain = (id, allCatsMap) => {
 
 
 exports.getAllCategoryIds = async function getAllCategoryIds(rootId) {
+
   const allCats = await Category.findAll({
-    attributes: ['uuid', 'parent_category_id', 'slug'],
+    attributes: ['uuid', "name","display_name",'parent_category_id', 'slug'],
     raw: true
   });
 const childrenMap = allCats.reduce((map, cat) => {
@@ -264,7 +279,6 @@ function collectLeafIds(rootId) {
 
   return leafIds;
 }
- 
 
   return Array.from(collectLeafIds(rootId));
 };
@@ -272,12 +286,18 @@ function collectLeafIds(rootId) {
 exports.getAllNestedCategorieswithallchildren=async(req,res)=>{
 
   try {
-    let {id}=req.body;
+    let {id,deleted=false,includeall=true}=req.body;
     if(!id || id===null||id===undefined)id=null;
    
+    let where={};
+    if(includeall){}
+    else{
+    if(deleted!==undefined || deleted !==null)where.softdelete=deleted;
+    }
 
       const allCats = await Category.findAll({
-    attributes: ['uuid', 'parent_category_id','name', 'slug'],
+    where:where,
+    attributes: ['uuid', 'parent_category_id','name', "display_name",'slug'],
     raw: true
   });
 
@@ -326,7 +346,6 @@ const childrenMap = allCats.reduce((map, cat) => {
   map[pid].push(cat);
   return map;
 }, {});
-console.log(childrenMap,"dddddddddddddddddddddddddddddddd")
 
    const leafIds=buildleafids(childrenMap,id);
    if(!leafIds)return res.status(404).json({err:'not found'});
@@ -430,14 +449,14 @@ exports.getcategories=async(req,res)=>{
 }
 exports.filtercategories=async(req,res)=>{
   try {
-    const{id,parent_id,name,slug,description,softdeleted,page=1,limit=10,orderby}=req.body;
+    let{id,parent_id,name,slug,description,softdeleted,page=1,limit=10,orderby}=req.body;
     let where={};
     if(id)where.uuid=id;
     if(parent_id)where.parent_category_id=parent_id;
     if(name)where.name=name;
     if(slug)where.slug=slug;
     if(description)where.description={[Op.like]:`%${description}%`};
-    if(softdeleted!==null|| softdeleted!==undefined)where.softdeleted=softdeleted;
+    if(typeof softdeleted==="Boolean")where.softdeleted=softdeleted;
     page=parseInt(page);
     limit=parseInt(limit);
     const offset=(page-1)*limit;
@@ -462,7 +481,7 @@ exports.searchincategories=async(req,res)=>{
     if(parent_id)where.parent_category_id={[Op.like]:`%${parent_id}%`};
     if(name)where.name={[Op.like]:`%${name}%`};
     if(slug)where.slug={[Op.like]:`%${slug}%`};
-        if(display_name)where.display_name={[Op.like]:`%${display_name}%`};
+    if(display_name)where.display_name={[Op.like]:`%${display_name}%`};
     if(description)where.description={[Op.like]:`%${description}%`};
     if(softdeleted!==null|| softdeleted!==undefined)where.softdeleted=softdeleted;
     page=parseInt(page);

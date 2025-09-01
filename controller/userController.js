@@ -294,7 +294,6 @@ exports.login= async (req,res)=>{
 
 ///////////////////////////////////////////////////////////////////////////////////////
 exports.iflogin=async(req,res,next)=>{
-  console.log("ffffffffffffffffffffffffffffffffffffffffffffffffff")
         const newtoken=jwt.sign({email:req.user.email,id:req.user.id,hashpassword:req.user.hashpassword},process.env.SECRET_KEY,{expiresIn:"5s"});
           return  res.status(200).json({authtoken:newtoken});
     
@@ -375,9 +374,12 @@ function genratreauth(result){
 // }
 
 exports.singup= async (req,res)=>{
+
   try {
-    let{bio ,username,profile_pic}=req.body;
-    const {phoneNumber,name,password,email}=req.body;
+
+
+    let{bio ,username,profile_pic,email}=req.body;
+    const {phoneNumber,name,password}=req.body;
     
     
 
@@ -398,8 +400,9 @@ exports.singup= async (req,res)=>{
 
   const role_id="general_user";
   const status_id="pending";
-  
-const existingUser = await User.findOne({ where: { phone: phoneNumber } });
+  if(email==="")email=null;
+
+const existingUser = await User.findOne({ where: { phone_number: phoneNumber } });
 
 if (existingUser) {
     if (existingUser.role_id==="geust_user") {
@@ -417,6 +420,7 @@ if (existingUser) {
         // optionally send welcome email / token
         return res.json({ success: true, message: "Guest upgraded to full account" });
     } else {
+      
         // Phone already exists for real user
         return res.status(400).json({ error: "Phone number already registered" });
     }
@@ -438,6 +442,8 @@ if (existingUser) {
   res.status(201).json(singup_user);
 }
   } catch (error) {
+              console.log(error);
+
     res.status(500).json({error:error.message});
   }
 }
