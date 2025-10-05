@@ -1,3 +1,7 @@
+// controllers/adsController.js
+const path = require("path");
+const fs = require("fs");
+const { DB: sequelize } = require("../config/config.js");
 const { Ads } = require("../models");
 const orderMapAds = {
   "id-asc": [["id", "ASC"]],
@@ -13,6 +17,8 @@ const orderMapAds = {
   "updated-asc": [["updatedAt", "ASC"]],
   "updated-desc": [["updatedAt", "DESC"]],
 };
+const UPLOADS_DIR = path.join(__dirname, "..", "..", "uploads");
+
 const deleteFile = (filename) => {
   if (!filename) return;
   const filepath = path.join(__dirname, "../uploads", filename);
@@ -186,7 +192,7 @@ exports.searchinAds=async(req,res)=>{
     if(link_path)where.link_path={[Op.like]:`%${link_path}%`};
     if(photo_path)where.photo_path={[Op.like]:`%${photo_path}%`};
     if(isvalid!==null || isvalid!==undefined)where.isvalid=isvalid;
-    const {count,rows} = await Address.findAndCountAll({where,limit,offset,order});  
+    const {count,rows} = await Address.findAndCountAll({where,limit,offset,orderBy});  
     if(!count ||!rows)return res.status(404).json({error:"the ads was not found"});
     res.status(200).json({   
       succes:true,
@@ -242,23 +248,163 @@ exports.updateAd = async (req, res) => {
     res.status(500).json({ message: "Error updating Ad" });
   }
 };
-exports.addAd = async (req, res) => {
+
+
+
+
+
+///////////////////////////////////////////////////////////
+
+
+// same uploads dir as middleware (keep consistent)
+
+exports.addad = async (req, res) => {
   try {
-    const { name, title, link_path, isvalid=false } = req.body;
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "Photo is required" });
+    const { name, title, link_path = "/", isvalid = false } = req.body;
+
+    if (!name) return res.status(400).json({ error: "name is required" });
+
+    let photo_path = null;
+    let disk_filename = null;
+
+    if (req.files && req.files.length > 0) {
+      // middleware provides processed objects: { originalname, filename, publicUrl }
+      const file = req.files[0];
+      photo_path = file.publicUrl;
+      disk_filename = file.filename;
+    } else if (req.body.photo_path && req.body.disk_filename) {
+      // allow providing external values (e.g., when migrating)
+      photo_path = req.body.photo_path;
+      disk_filename = req.body.disk_filename;
+    } else {
+      return res.status(400).json({ error: "image file is required (or provide photo_path + disk_filename)" });
     }
-    if(!name || !title )return res.status(404).json({error:"you should send the name and title for the ad",msg:""})
-    const photo_path = req.files[0].filename;
+
     const ad = await Ads.create({
       name,
       title,
       link_path,
-      isvalid,
       photo_path,
+      disk_filename,
+      isvalid: !!(Number(isvalid) || isvalid)
     });
-    res.status(201).json({ads:ad,succes:true,msg:'the ad was added successfully'});
+
+    return res.status(201).json(ad);
   } catch (err) {
-    res.status(500).json({ message: "Error creating Ad" });
+    console.error(err);
+    // handle unique constraint on disk_filename
+    if (err.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({ error: "disk_filename must be unique" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+
+
+
+exports.adupdate = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.body;
+    const ad = await Ads.findByPk(id, { transaction: t });
+    if (!ad) {
+      await t.rollback();
+      return res.status(404).json({ error: "Ad not found" });
+    }
+
+    let { name, title, link_path, isvalid } = req.body;
+    name = name ?? ad.name;
+    title = title ?? ad.title;
+    link_path = link_path ?? ad.link_path;
+    isvalid = (isvalid === undefined || isvalid === null) ? ad.isvalid : !!(Number(isvalid) || isvalid);
+
+    // If new file uploaded -> delete old disk file (safe) and set new values
+    if (req.files && req.files.length > 0) {
+      const newFile = req.files[0];
+
+      // delete old disk file if exists
+      if (ad.disk_filename) {
+        try {
+          const oldPath = path.join(UPLOADS_DIR, ad.disk_filename);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        } catch (e) {
+          console.warn("Couldn't delete old ad file:", e.message);
+        }
+      } else if (ad.photo_path) {
+        // fallback: try deriving filename from photo_path
+        try {
+          const oldFilename = decodeURIComponent(path.basename(ad.photo_path));
+          const oldPath = path.join(UPLOADS_DIR, oldFilename);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        } catch (e) { /* ignore */ }
+      }
+
+      ad.photo_path = newFile.publicUrl;
+      ad.disk_filename = newFile.filename;
+    } else if (req.body.photo_path && req.body.disk_filename) {
+      // allow updating paths explicitly
+      ad.photo_path = req.body.photo_path;
+      ad.disk_filename = req.body.disk_filename;
+    }
+
+    ad.name = name;
+    ad.title = title;
+    ad.link_path = link_path;
+    ad.isvalid = isvalid;
+
+    await ad.save({ transaction: t });
+    await t.commit();
+    return res.status(200).json(ad);
+  } catch (err) {
+    await t.rollback();
+    console.error(err);
+    if (err.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({ error: "disk_filename must be unique" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+exports.remove = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ad = await Ads.findByPk(id);
+    if (!ad) return res.status(404).json({ error: "Ad not found" });
+
+    // delete image file by disk_filename (reliable)
+    if (ad.disk_filename) {
+      try {
+        const filePath = path.join(UPLOADS_DIR, ad.disk_filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (e) {
+        console.warn("Couldn't delete ad image:", e.message);
+      }
+    } else if (ad.photo_path) {
+      // fallback
+      try {
+        const filename = decodeURIComponent(path.basename(ad.photo_path));
+        const filePath = path.join(UPLOADS_DIR, filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (e) {}
+    }
+
+    await ad.destroy();
+    return res.status(200).json({ message: "Ad deleted successfully" });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+exports.toggleValid = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ad = await Ads.findByPk(id);
+    if (!ad) return res.status(404).json({ error: "Ad not found" });
+    ad.isvalid = !ad.isvalid;
+    await ad.save();
+    return res.status(200).json(ad);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 };

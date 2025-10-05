@@ -13,7 +13,7 @@ const Supplier_shipment= DB.define('Supplier_shipment',
     },
     supplier_id:{
 
-        type:DataTypes.UUID,
+        type:DataTypes.CHAR(36),
         allowNull:false,
         
         validate:{
@@ -26,14 +26,17 @@ const Supplier_shipment= DB.define('Supplier_shipment',
       model: "suppliers",  
       key: 'uuid',
     },
-    },
+    onDelete: 'CASCADE',
+    onUpdate:"CASCADE",
+    
+},
     date_received:{
         type:DataTypes.DATEONLY,
         allowNull:true,
 
     },
     total_cost:{
-        type:DataTypes.DECIMAL(10,3),
+        type:DataTypes.DECIMAL(14,7),
         allowNull:false,
         validate:{
             notEmpty:true,
@@ -41,7 +44,7 @@ const Supplier_shipment= DB.define('Supplier_shipment',
         },
     }
     ,paid:{
-         type:DataTypes.DECIMAL(10,3),
+         type:DataTypes.DECIMAL(14,7),
         allowNull:false,
         defaultValue:0,
         validate:{

@@ -28,6 +28,8 @@ const Supplier_shipment_detail= DB.define('Supplier_shipment_detail',
       model: "supplier_shipments",  
       key: 'id',
     },
+    onDelete: 'CASCADE',
+    onUpdate:"CASCADE",
     },
     product_id:{
         type:DataTypes.UUID,
@@ -39,7 +41,8 @@ const Supplier_shipment_detail= DB.define('Supplier_shipment_detail',
         references:{
             model:"products",
             key:"uuid"
-        }
+        },
+        onUpdate:"CASCADE",
     },
     quantity:{
         type:DataTypes.INTEGER,
@@ -50,17 +53,17 @@ const Supplier_shipment_detail= DB.define('Supplier_shipment_detail',
         }
     },
     unit_cost:{
-        type:DataTypes.DECIMAL(10,2),
+        type:DataTypes.DECIMAL(20,10),
         allowNull:true,
     }
     ,
     total:{
-        type:DataTypes.DECIMAL(10,2),
+        type:DataTypes.DECIMAL(20,10),
         allowNull:true,
     }
     ,
     quantity_paid:{
-        type:DataTypes.DECIMAL(10,2),
+        type:DataTypes.DECIMAL(20,10),
         allowNull:false,
         defaultValue:0
     }
@@ -71,7 +74,7 @@ const Supplier_shipment_detail= DB.define('Supplier_shipment_detail',
 
     },
     total_cost:{
-        type:DataTypes.DECIMAL(10,3),
+        type:DataTypes.DECIMAL(20,10),
         allowNull:false,
         validate:{
             notEmpty:true,
@@ -79,7 +82,7 @@ const Supplier_shipment_detail= DB.define('Supplier_shipment_detail',
         },
     }
     ,paid:{
-         type:DataTypes.DECIMAL(10,3),
+         type:DataTypes.DECIMAL(20,10),
         allowNull:false,
         defaultValue:0,
         validate:{

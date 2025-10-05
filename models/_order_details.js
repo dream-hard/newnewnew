@@ -20,7 +20,10 @@ const Order_detail=DB.define("Order_detail",{
         references:{
             model:"orders",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
+        
     },
     product_id:{
         type:DataTypes.UUID,
@@ -28,7 +31,9 @@ const Order_detail=DB.define("Order_detail",{
         references:{
             model:"products",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     note:{
         type:DataTypes.STRING,
@@ -60,7 +65,6 @@ const Order_detail=DB.define("Order_detail",{
     allowNull: true,
     defaultValue:null,
     validate: {
-        isAlpha: true,
         len: [3, 3],
     }
 },  

@@ -1,5 +1,24 @@
-const { Order, Order_detail, Address, User, Shipping, Order_statu, Exchange_rate, Supplier_shipment_detail, Product } = require("../models/index.js");
+const { Op, Sequelize, where, Transaction } = require("sequelize");
+const { Order, Order_detail, Address, User, Shipping, Order_statu, Exchange_rate, Supplier_shipment_detail, Product, Shipping_method, Category, Product_statu, Product_condition, Product_image } = require("../models/index.js");
+const { DB } = require("../config/config.js");
+const bcrypt=require("bcryptjs");
 
+
+
+const orderOrderByMap = {
+  "date-asc": [["order_date", "ASC"]],
+  "date-desc": [["order_date", "DESC"]],
+  "total-asc": [["total_amount", "ASC"]],
+  "total-desc": [["total_amount", "DESC"]],
+  "paid-asc": [["total_amount_paid", "ASC"]],
+  "paid-desc": [["total_amount_paid", "DESC"]],
+  "status-asc": [["status_id", "ASC"]],
+  "status-desc": [["status_id", "DESC"]],
+  "created-asc": [["createdAt", "ASC"]],
+  "created-desc": [["createdAt", "DESC"]],
+  "updated-asc": [["updatedAt", "ASC"]],
+  "updated-desc": [["updatedAt", "DESC"]],
+};
 
 
 exports.create = async (req, res) => {
@@ -99,7 +118,6 @@ exports.deletewithoutuuid=async (req,res)=>{
   }
 }
 
-
 const hashPassword = async (password) => {
     const salt = await bcrypt.genSalt(10);
     return await bcrypt.hash(password, salt);
@@ -108,36 +126,56 @@ const hashPassword = async (password) => {
 
 
 exports.placeOrder = async (req, res) => {
-  const { user_id, address_id, custom_address } = req.body;
-  const { phoneNumber, shipping_address, products, note ,currency} = req.body;
-  let total_amount=[];
-  
+
+  let { user_id=null, address_id, custom_address } = req.body;
+  let { phoneNumber, shipping_address, products, note ,currency} = req.body;
+
+
+
   try {
+
+  let total_amount=[];
+  let total_amount_paid=[]
+  
     let total =0;
+    const sqlDateTime = new Date().toISOString().slice(0, 19).replace("T", " ");
     for (const item of products){
-            total += item.price * item.quantity;
+          if(item.currency!==currency){      
+            const rate = await Exchange_rate.findOne({order:[["dateofstart","DESC"]],where:{base_currency_id:item.currency,target_currency_id:currency,dateofstart:{[Op.lte]:sqlDateTime}}})
+            item.cost_per_one = item.cost_per_one * rate.exchange_rate;
+            item.currency=currency;
+            total += item.cost_per_one * item.quantity;
+            }else{
+                total += item.cost_per_one * item.quantity;
+            }
     }
     total_amount.push({amount:total,currency:currency});
-
-    if (!phone || !products || products.length === 0) {
+    total_amount_paid.push({amount:0,currency:currency})
+    if (!phoneNumber || !products || products.length === 0) {
         return res.status(400).json({ error: "Phone number and products are required" });
     }
-    let user = await User.findOne({ where: { phone_number:phoneNumber } });
-    let hashpassword=hashPassword("null");
-        if (!user) {
-            // Create guest user
-            user = await User.create({
-                phone_number:phoneNumber,
-                username: "guest_" + phoneNumber,
-                name:`${phoneNumber}`,
-                role_id:"geust_user",
-                status_id:"pending",
-                passwordhash:hashpassword,
-                bio:"i am auto genrated account",
+    let user;
+    if((user_id!==undefined||user_id!==null|| user_id!=="") && !phoneNumber){
+      user =await User.findByPk(user_id);
+    }else{
+      user = await User.findOne({ where: { phone_number:phoneNumber } });
 
-
-            });
-        }
+      let hashpassword= await hashPassword("null");
+      
+          if (!user) {
+              // Create guest user
+              if(!phoneNumber)return res.status(400).json({msg:"",error : "يجب عليك ارسال رقم الهاتف"})
+              user = await User.create({
+                  phone_number:phoneNumber,
+                  username: "guest_" + phoneNumber,
+                  name:`${phoneNumber}`,
+                  role_id:"geust",
+                  status_id:"pending",
+                  passwordhash:hashpassword,
+                  bio:"i am auto genrated account",
+              });
+          }
+    } 
 
     let shipping_address_id = null;
     let final_note = note || "";
@@ -172,13 +210,15 @@ exports.placeOrder = async (req, res) => {
       }
     }
     // 1. إنشاء الأوردر
+    let status=await Order_statu.findOne({where:{statu:"pending"}});
+    if(!status)return res.status(404).json({error:"not found status (pending)"});
     const order = await Order.create({
       user_id:user.uuid,
       shipping_address_id, 
       note: final_note,
-      status_id: 1, // Pending
+      status_id: status.id, // Pending
       total_amount,
-      total_amound_paid:[],
+      total_amount_paid:total_amount_paid,
 
     });
 
@@ -188,7 +228,7 @@ exports.placeOrder = async (req, res) => {
       product_id: p.product_id,
       quantity: p.quantity,
       cost_per_one: p.cost_per_one,
-      currency:currency,
+      currency:p.currency,
     }));
 
     await Order_detail.bulkCreate(orderDetails);
@@ -418,7 +458,7 @@ exports.updateOrderStatus = async (req, res) => {
         let productstodeletecount=await Order_detail.findAll({attributes:["product_id","quantity"],raw:true},{where:{order_id:order.uuid}});
       
         const t = await sequelize.transaction();
-
+        
         try {
           for (const { product_id, quantity } of productstodeletecount) {
             let remainingQty = quantity;
@@ -474,12 +514,12 @@ exports.updateOrderStatus = async (req, res) => {
         try {
         let cancel;
         if(!withdelete){
-        [order_update]=await order.update({status_id:status_id});
-        return res.status(200).json({success:true,msg:"تم إالغاء الطلب بنجاح من دون الإذالة كليا"});
+        order_update=await order.update({status_id:status_id});
+        return res.status(200).json({success:true,msg:"تم إالغاء الطلب بنجاح من دون الإزالة كليا"});
         }else{
-        [order_update]=await order.update({status_id:status_id});
+        order_update=await order.update({status_id:status_id});
         cancel = await order.destroy();
-        return res.status(200).json({success:true,msg:"تم إالغاء الطلب بنجاح مع الإذالة كليا"});
+        return res.status(200).json({success:true,msg:"تم إالغاء الطلب بنجاح مع الإزالة كليا"});
  
         }  
         } catch (error) {
@@ -561,11 +601,46 @@ exports.updateOrderStatus = async (req, res) => {
       }
         return res.json({ success: true, order });
     } catch (err) {
-        console.error(err);
         return res.status(500).json({ error: err.message });
     }
 };
+exports.payingorder=async(req,res)=>{
+  try {
+    let {paid,currency,order_id}=req.body;
 
+    paid=parseFloat(paid);
+    const order=await Order.findByPk(order_id);
+    if(!order)return res.status(404).json({msg:"",error:"not found order"});
+    const today = new Date().toISOString().split('T')[0];
+    let total_amount_infos=order.total_amount.map(item => {
+                    if (item.amount>0 ){
+                      return item;
+                    }
+                    
+                  });
+let total_amount_paid_infos=[];
+    if(currency!==total_amount_infos.currency){
+        const productdetailexg=await Exchange_rate.findOne({where:{     
+            base_currency_id:currency,
+            target_currency_id:total_amount_infos.currency,
+            dateofstart: { [Op.lte]: today }
+            },
+            attributes:["exchange_rate"],
+            order:[["dateofstart","DESC"]]
+            ,raw:true
+          });
+      total_amount_paid_infos.push({currency:total_amount_infos.currency,amount:paid*productdetailexg.exchange_rate});
+    }else{
+      total_amount_paid_infos.push({currency:currency,amount:paid})
+    }
+    order.total_amound_paid=total_amount_paid_infos;
+    await order.save();
+    res.status(200).json({success:true,msg:`تم الدفع بنجاح و المبلغ هو ${total_amount_paid_infos.amount}, من اصل ${total_amount_infos.amount},بعملة : ${total_amount_infos.currency}`});
+    
+  } catch (error) {
+            return res.status(500).json({ error: err.message });
+  }
+}
 exports.softdelete=async (req,res)=>{
   try {
     const {id}=req.body;
@@ -592,3 +667,867 @@ exports.justgetall=async(req,res)=>{
 
   }
 }
+
+// ============== FILTER ORDERS ==================
+exports.filterorders = async (req, res) => {
+  try {
+    let {
+      page = 1,
+      limit = 10,
+      orderby,
+      id,
+      user_id,
+      address_id,
+      status_id,
+      status,
+      order_date,
+      order_date_dir = "eq",
+      total_amount,
+      total_amound_currency,
+      total_amount_dir = "eq",
+      total_amount_paid,
+      total_amount_paid_dir= "eq",
+      total_amound_paid_currency,
+      soft_deleted,
+      note,
+      product_ids,
+
+    } = req.body;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    let order = orderOrderByMap[orderby] || orderOrderByMap["created-desc"];
+
+    let where = {};
+    if (id) where.uuid = id;
+    if (user_id) where.user_id = user_id;
+    if (address_id) where.shipping_address_id = address_id;
+    if (status_id) where.status_id = status_id;
+    if (soft_deleted !== undefined) where.soft_deleted = soft_deleted;
+    if (note) where.note = { [Op.like]: `%${note}%` };
+
+    // order_date filtering
+    if (order_date !== undefined && order_date_dir) {
+      switch (order_date_dir) {
+        case "eq":
+          where.order_date = { [Op.eq]: order_date };
+          break;
+        case "gte":
+          where.order_date = { [Op.gte]: order_date };
+          break;
+        case "lte":
+          where.order_date = { [Op.lte]: order_date };
+          break;
+        case "gt":
+          where.order_date = { [Op.gt]: order_date };
+          break;
+        case "lt":
+          where.order_date = { [Op.lt]: order_date };
+          break;
+      }
+    }
+
+    // total_amount filtering (JSON with currency)
+// total_amount filtering with dir
+if (total_amount !== undefined && total_amound_currency) {
+  switch (total_amount_dir) {
+    case "eq":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount, '$[*].amount')) AS DECIMAL(20,2)) = ${total_amount}`
+      );
+      break;
+    case "gte":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount, '$[*].amount')) AS DECIMAL(20,2)) >= ${total_amount}`
+      );
+      break;
+    case "lte":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount, '$[*].amount')) AS DECIMAL(20,2)) <= ${total_amount}`
+      );
+      break;
+    case "gt":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount, '$[*].amount')) AS DECIMAL(20,2)) > ${total_amount}`
+      );
+      break;
+    case "lt":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount, '$[*].amount')) AS DECIMAL(20,2)) < ${total_amount}`
+      );
+      break;
+    default:
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount, '$[*].amount')) AS DECIMAL(20,2)) = ${total_amount}`
+      );
+      break;
+  }
+
+  // also filter by currency inside JSON
+  where[Op.and] = Sequelize.literal(
+    `JSON_SEARCH(total_amount, 'one', '${total_amound_currency}', NULL, '$[*].currency') IS NOT NULL`
+  );
+}
+
+// total_amount_paid filtering with dir
+if (total_amount_paid !== undefined && total_amound_paid_currency) {
+  switch (total_amount_paid_dir) {
+    case "eq":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount_paid, '$[*].amount')) AS DECIMAL(20,2)) = ${total_amount_paid}`
+      );
+      break;
+    case "gte":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount_paid, '$[*].amount')) AS DECIMAL(20,2)) >= ${total_amount_paid}`
+      );
+      break;
+    case "lte":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount_paid, '$[*].amount')) AS DECIMAL(20,2)) <= ${total_amount_paid}`
+      );
+      break;
+    case "gt":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount_paid, '$[*].amount')) AS DECIMAL(20,2)) > ${total_amount_paid}`
+      );
+      break;
+    case "lt":
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount_paid, '$[*].amount')) AS DECIMAL(20,2)) < ${total_amount_paid}`
+      );
+      break;
+    default:
+      where[Op.and] = Sequelize.literal(
+        `CAST(JSON_UNQUOTE(JSON_EXTRACT(total_amount_paid, '$[*].amount')) AS DECIMAL(20,2)) = ${total_amount_paid}`
+      );
+      break;
+  }
+
+  where[Op.and] = Sequelize.literal(
+    `JSON_SEARCH(total_amount_paid, 'one', '${total_amound_paid_currency}', NULL, '$[*].currency') IS NOT NULL`
+  );
+}
+
+    const includeOptions = [
+      {
+        model: User,
+        attributes: ["uuid", "username", "phone_number"],
+      },
+      {
+        model: Address,
+        attributes: ["id", "name", "cost"],
+      },
+      {
+        model: Order_statu,
+        attributes: ["id", "statu"],
+      
+      },
+      
+    ];
+  
+    if(status){includeOptions[2].where={statu:status}
+        includeOptions[2].required = true;
+};
+
+    let matchedIds = null;
+    if (product_ids && product_ids.length > 0) {
+      const idsRows = await Order_detail.findAll({
+        attributes: [],
+        where: { product_id: { [Op.in]: product_ids } },
+        group: ['order_id'],
+        having: Sequelize.literal(`COUNT(DISTINCT product_id) = ${product_ids.length}`),
+        raw: true
+      });
+      matchedIds = idsRows.map(r => r.order_id);
+      if (matchedIds.length === 0) {
+        return res.status(200).json({ products: [], total: 0, currentPage: page, totalPages: 0 });
+      }
+      // ضيف شرط للـ where ليجلب المنتجات اللي بترجعهم matchedIds
+      where.uuid = { [Op.in]: matchedIds };
+    }
+
+    const queryOptions = {
+      where,
+      include: includeOptions,
+      order,
+      limit,
+      offset,
+      subQuery: false,
+      distinct: true,
+    };
+
+    const { count, rows } = await Order.findAndCountAll(queryOptions);
+
+    return res.status(200).json({
+      orders: rows,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ============== SEARCH IN ORDERS ==================
+exports.searchinorders = async (req, res) => {
+  try {
+    let {
+      page = 1,
+      limit = 10,
+      orderby,
+      id,
+      user_id,
+      address_id,
+      status_id,
+      status,
+      order_date,
+      order_date_dir = "eq",
+      total_amount,
+      total_amound_currency,
+      total_amount_dir = "eq",
+      total_amount_paid,
+      total_amound_paid_currency,
+
+      soft_deleted,
+      note,
+    } = req.body;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    let order = orderOrderByMap[orderby] || orderOrderByMap["created-desc"];
+
+    let where = {};
+        if (order_date !== undefined && order_date_dir) {
+      switch (order_date_dir) {
+        case "eq":
+          where.order_date = { [Op.eq]: order_date };
+          break;
+        case "gte":
+          where.order_date = { [Op.gte]: order_date };
+          break;
+        case "lte":
+          where.order_date = { [Op.lte]: order_date };
+          break;
+        case "gt":
+          where.order_date = { [Op.gt]: order_date };
+          break;
+        case "lt":
+          where.order_date = { [Op.lt]: order_date };
+          break;
+      }
+    }
+    if (id) where.id = { [Op.like]: `%${id}%` };
+    if (user_id) where.user_id = { [Op.like]: `%${user_id}%` };
+    if (address_id) where.shipping_address_id = { [Op.like]: `%${address_id}%` };
+    if (status_id) where.status_id = { [Op.like]: `%${status_id}%` };
+    if (soft_deleted !== undefined) where.soft_deleted = soft_deleted;
+
+    // fuzzy search for note and status
+    if (note) where.note = { [Op.like]: `%${note}%` };
+    if (status) {
+      // search through joined status
+    }
+
+    const includeOptions = [
+      {
+        model: User,
+        attributes: ["uuid", "name", "phone_number"],
+      },
+      {
+        model: Address,
+        attributes: ["id", "name", "price"],
+      },
+      {
+        model: OrderStatus,
+        attributes: ["id", "statu"],
+        where: status
+          ? { statu: { [Op.like]: `%${status}%` } }
+          : undefined,
+      },
+    ];
+
+    const queryOptions = {
+      where,
+      include: includeOptions,
+      order,
+      limit,
+      offset,
+      subQuery: false,
+      distinct: true,
+    };
+
+    const { count, rows } = await Order.findAndCountAll(queryOptions);
+
+    return res.status(200).json({
+      orders: rows,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.justgetall=async(req,res)=>{
+  try {
+    let {page=1,limit=Number.MAX_SAFE_INTEGER,orderby}=req.body;
+    page = parseInt(page);
+    limit=parseInt(limit);
+    const offset=(page-1)*limit;
+    const order=orderOrderByMap[orderby]||orderOrderByMap["created-desc"];
+      const includeOptions = [
+      {
+        model: User,
+        attributes: ["uuid", "name", "phone_number"],
+      },
+      {
+        model: Address,
+        attributes: ["id", "name", "price"],
+      },
+      {
+        model:Order_statu,
+        attributes: ["id", "statu"],
+      }
+    ];
+
+    const { count, rows } = await Order.findAndCountAll({
+      raw:false,
+      order,
+      offset,
+      limit,
+      include: includeOptions,
+      
+    });
+
+    return res.status(200).json({
+      orders: rows,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+    });
+  } catch (error) {
+        res.status(500).json({ error: error.message });
+  }
+}
+
+exports.justgetalltheorder=async (req,res)=>{
+  try {
+    const {order_id}=req.body;
+    if(!order_id)return res.status(404).json({msg:"",error:"please send the order id"});
+    const includeOptions=[
+      {model:User,
+        attributes:['uuid',"name","phone_number",'profile_pic'],
+      },
+      {model:Shipping,
+        attributes:['tracknumber',"cost",'shipping_date',"dlivered_date","note"],
+        required:false,
+        include:[{model:Shipping_method,attributes:['name','cost']}]
+      },
+      {model:Order_statu,
+        attributes:['statu'],
+        required:false,
+
+      },
+      {model:Order_detail,
+        where:{softdeleted:false},
+        attributes:["id",'note',"quantity","cost_per_one","currency"],
+        required:true,
+        include:[{model:Product,
+                  include:[
+                          {model:Category,
+                            attributes:["slug","display_name"],
+                          },
+                     
+                          {
+                            model:Product_statu,
+                            attributes:['statu']
+                          },
+                          {
+                            model:Product_condition,
+                            attributes:['condition']
+                          },
+                          {
+                            model:Product_image,
+                            attributes:['filename'],
+                            where:{image_type:"main"}
+                          }],
+                  attributes:['currency_id',"title","slug","isactive_name","isactive_price","isactive_phonenumber","discount","price","original_price","warranty","warranty_period"]}]
+
+      }];
+      const order =await Order.findOne({include:includeOptions,where:{uuid:order_id}});
+      if(!order)return res.status(404).json({msg:"",error:"Not found any order  details for this order"})
+        return res.status(200).json({success:true,order_details:order})
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+exports.justgettheorder=async(req,res)=>{
+  try {
+        const {order_id}=req.body;
+    if(!order_id)return res.status(404).json({msg:"",error:"please send the order id"});
+    const includeOptions=[
+      {model:User,
+        attributes:["name","phone_number",'profile_pic'],
+        required:true
+      },
+      {model:Shipping,
+        attributes:['tracknumber',"cost",'shipping_date',"dlivered_date","note"],
+        required:false,
+        include:[{model:Shipping_method,attributes:['name','cost']}]
+      },
+      {model:Order_statu,
+        attributes:['statu'],
+        required:false,
+
+      },
+      {model:Order_detail,
+        where:{softdeleted:false},
+        attributes:["id",'note',"quantity","cost_per_one","currency"],
+        required:true,
+        include:[{model:Product,
+                  include:[
+                          {model:Category,
+                            attributes:["slug","display_name"],
+                          },
+                          {
+                            model:Product_statu,
+                            attributes:['statu']
+                          },
+                          {
+                            model:Product_condition,
+                            attributes:['condition']
+                          }],
+                  attributes:['currency_id',"title","slug","isactive_name","isactive_price","isactive_phonenumber","discount","price","original_price","warranty","warranty_period"]}]
+
+      }];
+      const order =await Order_detail.findAll({include:includeOptions,where:{order_id:order_id}});
+      if(!order)return res.status(404).json({msg:"",error:"Not found any order  details for this order"})
+      return res.status(200).json({success:true,order_details:order})
+  } catch (error) {
+    
+  }
+}
+exports.justgetmyorders=async(req,res)=>{
+  try {
+    let {page=1,limit=Number.MAX_SAFE_INTEGER,orderby,user_id=req.user.id}=req.body;
+    page=parseInt(page);
+    limit=parseInt(limit);
+    const offset=(page-1)*limit;
+    const order =orderOrderByMap[orderby]||orderOrderByMap['created-desc'];
+      const includeOptions = [
+      {
+        model: User,
+        attributes: ["uuid", "name", "phone_number"],
+      },
+      {
+        model: Address,
+        attributes: ["id", "name", "price"],
+      },
+      {
+        model:Order_statu,
+        attributes: ["id", "statu"],
+      }
+    ];
+    let where ={};
+    where.user_id=user_id;
+    const { count, rows } = await Order.findAndCountAll({
+      where,
+      raw:false,
+      order,
+      offset,
+      limit,
+      include: includeOptions,
+      attributes:['note',"total_amount_paid","total_amount","order_date","uuid"]
+      
+    });
+
+    return res.status(200).json({
+      orders: rows,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+    });
+  } catch (error) {
+    
+  }
+}
+// controllers/orderController.js
+
+// ============== FILTER ORDERS ==================
+exports.filterorders2 = async (req, res) => {
+  try {
+    let {
+      page = 1,
+      limit = 10,
+      orderby,
+      id,
+      user_id,
+      address_id,
+      status_id,
+      status,
+      order_date,
+      order_date_dir = "eq",
+      total_amount,
+      total_amound_currency,
+      total_amount_dir = "eq",
+      total_amount_paid,
+      total_amount_paid_dir = "eq",
+      total_amound_paid_currency,
+      soft_deleted,
+      note,
+      product_id,       // can be single id or array
+      product_match,    // optional: 'all' => match all product ids, otherwise any
+    } = req.body;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    const order = orderOrderByMap[orderby] || orderOrderByMap["created-desc"];
+
+    // build basic where
+    let where = {};
+    if (id) where.uuid = id;
+    if (user_id) where.user_id = user_id;
+    if (address_id) where.shipping_address_id = address_id;
+    if (status_id) where.status_id = status_id;
+    if (soft_deleted !== undefined) where.soft_deleted = soft_deleted;
+    if (note) where.note = { [Op.like]: `%${note}%` };
+
+    // order_date filtering
+    if (order_date !== undefined) {
+      switch (order_date_dir) {
+        case "eq": where.order_date = { [Op.eq]: order_date }; break;
+        case "gte": where.order_date = { [Op.gte]: order_date }; break;
+        case "lte": where.order_date = { [Op.lte]: order_date }; break;
+        case "gt": where.order_date = { [Op.gt]: order_date }; break;
+        case "lt": where.order_date = { [Op.lt]: order_date }; break;
+        default: where.order_date = { [Op.eq]: order_date }; break;
+      }
+    }
+
+    // جمع الشروط الـ raw (لـ JSON) في مصفوفة حتى نركبهم مع بعض
+    const rawConditions = [];
+
+    // total_amount filtering with dir & currency using JSON_TABLE (MySQL 8+)
+    if (total_amount !== undefined && total_amound_currency) {
+      // تأكد القيم عددية عشان ما يدخلوا SQL غير متوقع
+      const sanitizedAmount = Number(total_amount);
+      const currency = String(total_amound_currency).replace(/'/g, "''");
+
+      const cmp = (() => {
+        switch (String(total_amount_dir)) {
+          case "gte": return `>= ${sanitizedAmount}`;
+          case "lte": return `<= ${sanitizedAmount}`;
+          case "gt": return `> ${sanitizedAmount}`;
+          case "lt": return `< ${sanitizedAmount}`;
+          case "eq":
+          default: return `= ${sanitizedAmount}`;
+        }
+      })();
+
+      // JSON_TABLE subquery: finds any element with matching currency and compares amount
+      rawConditions.push(
+        `EXISTS (
+          SELECT 1 FROM JSON_TABLE(total_amount, '$[*]' 
+            COLUMNS(
+              currency VARCHAR(64) PATH '$.currency',
+              amount DECIMAL(65,6) PATH '$.amount'
+            )
+          ) AS jt WHERE jt.currency = '${currency}' AND jt.amount ${cmp}
+        )`
+      );
+    }
+
+    // total_amount_paid filtering with dir & currency
+    if (total_amount_paid !== undefined && total_amound_paid_currency) {
+      const sanitizedAmountPaid = Number(total_amount_paid);
+      const currencyPaid = String(total_amound_paid_currency).replace(/'/g, "''");
+
+      const cmpPaid = (() => {
+        switch (String(total_amount_paid_dir)) {
+          case "gte": return `>= ${sanitizedAmountPaid}`;
+          case "lte": return `<= ${sanitizedAmountPaid}`;
+          case "gt": return `> ${sanitizedAmountPaid}`;
+          case "lt": return `< ${sanitizedAmountPaid}`;
+          case "eq":
+          default: return `= ${sanitizedAmountPaid}`;
+        }
+      })();
+
+      rawConditions.push(
+        `EXISTS (
+          SELECT 1 FROM JSON_TABLE(total_amount_paid, '$[*]' 
+            COLUMNS(
+              currency VARCHAR(64) PATH '$.currency',
+              amount DECIMAL(65,6) PATH '$.amount'
+            )
+          ) AS jt2 WHERE jt2.currency = '${currencyPaid}' AND jt2.amount ${cmpPaid}
+        )`
+      );
+    }
+
+    // لو في raw conditions ضيفهم للـ where مع Op.and
+    if (rawConditions.length > 0) {
+      where[Op.and] = rawConditions.map(cond => Sequelize.literal(cond));
+    }
+
+    // build include options
+    const includeOptions = [
+      {
+        model: User,
+        attributes: ["uuid", "username", "phone_number"],
+      },
+      {
+        model: Address,
+        attributes: ["id", "name", "cost"],
+      },
+      {
+        model: Order_statu,
+        attributes: ["id", "statu"],
+      },
+    ];
+
+    if (status) {
+      // لو بدك فلتر على اسم الحالة
+      includeOptions[2].where = { statu: { [Op.like]: `%${status}%` } };
+      includeOptions[2].required = true;
+    }
+
+    // product filtering:
+    if (product_id !== undefined && product_id !== null) {
+      // case: match ALL (إذا أرسلت مصفوفة وطلعت product_match === 'all')
+      if (Array.isArray(product_id) && product_id.length > 0 && product_match === "all") {
+        // نجيب كل الـ orders اللي تحتوي كل الـ product ids
+        const matched = await OrderDetail.findAll({
+          attributes: ['order_uuid'],
+          where: { product_id: { [Op.in]: product_id } },
+          group: ['order_uuid'],
+          having: Sequelize.literal(`COUNT(DISTINCT product_id) = ${product_id.length}`),
+          raw: true
+        });
+
+        const matchedOrderUuids = matched.map(r => r.order_uuid);
+        if (matchedOrderUuids.length === 0) {
+          return res.status(200).json({ orders: [], total: 0, currentPage: page, totalPages: 0 });
+        }
+        where.uuid = { [Op.in]: matchedOrderUuids };
+      } else {
+        // أي-match (any of the provided ids) أو single id
+        const prodWhere = Array.isArray(product_id) ? { product_id: { [Op.in]: product_id } } : { product_id };
+        includeOptions.push({
+          model: OrderDetail,
+          as: "order_details",   // عدّل الـ alias إذا عندك alias مختلف في associations
+          attributes: [],        // لو بدك تفاصيل من الـ order_details حط الحقول هون
+          where: prodWhere,
+          required: true
+        });
+      }
+    }
+
+    const queryOptions = {
+      where,
+      include: includeOptions,
+      order,
+      limit,
+      offset,
+      subQuery: false,
+      distinct: true
+    };
+
+    const { count, rows } = await Order.findAndCountAll(queryOptions);
+
+    return res.status(200).json({
+      orders: rows,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit)
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// ============== SEARCH IN ORDERS ==================
+exports.searchinorders2 = async (req, res) => {
+  try {
+    let {
+      page = 1,
+      limit = 10,
+      orderby,
+      id,
+      user_id,
+      address_id,
+      status_id,
+      status,
+      order_date,
+      order_date_dir = "eq",
+      total_amount,
+      total_amound_currency,
+      total_amount_dir = "eq",
+      total_amount_paid,
+      total_amount_paid_dir = "eq",
+      total_amound_paid_currency,
+      soft_deleted,
+      note,
+      product_id,
+      product_match,
+      q, // optional generic search query
+    } = req.body;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const offset = (page - 1) * limit;
+
+    const order = orderOrderByMap[orderby] || orderOrderByMap["created-desc"];
+
+    let where = {};
+    if (id) where.uuid = id;
+    if (user_id) where.user_id = user_id;
+    if (address_id) where.shipping_address_id = address_id;
+    if (status_id) where.status_id = status_id;
+    if (soft_deleted !== undefined) where.soft_deleted = soft_deleted;
+
+    // fuzzy search fields
+    if (note) where.note = { [Op.like]: `%${note}%` };
+    if (q) {
+      // generic search across note and maybe more (expand as needed)
+      where[Op.or] = [
+        { note: { [Op.like]: `%${q}%` } },
+        // add more searchable fields here if needed
+      ];
+    }
+
+    // order_date filter
+    if (order_date !== undefined) {
+      switch (order_date_dir) {
+        case "eq": where.order_date = { [Op.eq]: order_date }; break;
+        case "gte": where.order_date = { [Op.gte]: order_date }; break;
+        case "lte": where.order_date = { [Op.lte]: order_date }; break;
+        case "gt": where.order_date = { [Op.gt]: order_date }; break;
+        case "lt": where.order_date = { [Op.lt]: order_date }; break;
+        default: where.order_date = { [Op.eq]: order_date }; break;
+      }
+    }
+
+    const rawConditions = [];
+
+    // same JSON filters as in filterorders
+    if (total_amount !== undefined && total_amound_currency) {
+      const sanitizedAmount = Number(total_amount);
+      const currency = String(total_amound_currency).replace(/'/g, "''");
+      const cmp = (() => {
+        switch (String(total_amount_dir)) {
+          case "gte": return `>= ${sanitizedAmount}`;
+          case "lte": return `<= ${sanitizedAmount}`;
+          case "gt": return `> ${sanitizedAmount}`;
+          case "lt": return `< ${sanitizedAmount}`;
+          case "eq":
+          default: return `= ${sanitizedAmount}`;
+        }
+      })();
+      rawConditions.push(
+        `EXISTS (
+          SELECT 1 FROM JSON_TABLE(total_amount, '$[*]' 
+            COLUMNS(currency VARCHAR(64) PATH '$.currency', amount DECIMAL(65,6) PATH '$.amount')
+          ) AS jt WHERE jt.currency = '${currency}' AND jt.amount ${cmp}
+        )`
+      );
+    }
+
+    if (total_amount_paid !== undefined && total_amound_paid_currency) {
+      const sanitizedAmountPaid = Number(total_amount_paid);
+      const currencyPaid = String(total_amound_paid_currency).replace(/'/g, "''");
+      const cmpPaid = (() => {
+        switch (String(total_amount_paid_dir)) {
+          case "gte": return `>= ${sanitizedAmountPaid}`;
+          case "lte": return `<= ${sanitizedAmountPaid}`;
+          case "gt": return `> ${sanitizedAmountPaid}`;
+          case "lt": return `< ${sanitizedAmountPaid}`;
+          case "eq":
+          default: return `= ${sanitizedAmountPaid}`;
+        }
+      })();
+      rawConditions.push(
+        `EXISTS (
+          SELECT 1 FROM JSON_TABLE(total_amount_paid, '$[*]' 
+            COLUMNS(currency VARCHAR(64) PATH '$.currency', amount DECIMAL(65,6) PATH '$.amount')
+          ) AS jt2 WHERE jt2.currency = '${currencyPaid}' AND jt2.amount ${cmpPaid}
+        )`
+      );
+    }
+
+    if (rawConditions.length > 0) {
+      where[Op.and] = rawConditions.map(cond => Sequelize.literal(cond));
+    }
+
+    // include options
+    const includeOptions = [
+      { model: User, attributes: ["uuid", "username", "phone_number"] },
+      { model: Address, attributes: ["id", "name", "cost"] },
+      { model: Order_statu, attributes: ["id", "statu"] },
+    ];
+
+    if (status) {
+      includeOptions[2].where = { statu: { [Op.like]: `%${status}%` } };
+      includeOptions[2].required = true;
+    }
+
+    // product filters same as filterorders
+    if (product_id !== undefined && product_id !== null) {
+      if (Array.isArray(product_id) && product_id.length > 0 && product_match === "all") {
+        const matched = await OrderDetail.findAll({
+          attributes: ['order_uuid'],
+          where: { product_id: { [Op.in]: product_id } },
+          group: ['order_uuid'],
+          having: Sequelize.literal(`COUNT(DISTINCT product_id) = ${product_id.length}`),
+          raw: true
+        });
+
+        const matchedOrderUuids = matched.map(r => r.order_uuid);
+        if (matchedOrderUuids.length === 0) {
+          return res.status(200).json({ orders: [], total: 0, currentPage: page, totalPages: 0 });
+        }
+        where.uuid = { [Op.in]: matchedOrderUuids };
+      } else {
+        const prodWhere = Array.isArray(product_id) ? { product_id: { [Op.in]: product_id } } : { product_id };
+        includeOptions.push({
+          model: OrderDetail,
+          as: "order_details",
+          attributes: [],
+          where: prodWhere,
+          required: true
+        });
+      }
+    }
+
+    const queryOptions = {
+      where,
+      include: includeOptions,
+      order,
+      limit,
+      offset,
+      subQuery: false,
+      distinct: true
+    };
+
+    const { count, rows } = await Order.findAndCountAll(queryOptions);
+
+    return res.status(200).json({
+      orders: rows,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit)
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};

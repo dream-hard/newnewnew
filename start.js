@@ -27,6 +27,12 @@ const Product_attribute_routes=require('./routes/ProductAttriubteRoutes');
 const Product_routes=require("./routes/ProductRoutes");
 const Product_status_routes=require("./routes/ProductStatusRoutes");
 const Product_condition_routes=require("./routes/ProductConditionRoutes");
+const Supplier_routes=require('./routes/SupplierRoutes');
+const Supplier_shipment_routes=require("./routes/Supplier_shipmentRoutes");
+const Supplier_shipment_details_routes=require("./routes/Supplier_shipment_detailsRoutes");
+const Json_routes=require('./routes/JsonRoutes');
+const Order_routes=require("./routes/OrderRoutes")
+const Order_Status_routes=require('./routes/OrderStatusRoutes')
 const path = require('path');
 
 
@@ -63,7 +69,6 @@ const corsoption = {
         callback(null, true);
   }
 };
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 
 app.use(
@@ -105,8 +110,14 @@ app.use(Product_attribute_routes);
 app.use(Product_routes);
 app.use(Product_status_routes);
 app.use(Product_condition_routes);
+app.use(Supplier_routes);
+app.use(Supplier_shipment_routes);
+app.use(Supplier_shipment_details_routes);
+app.use(Json_routes);
+app.use(Order_routes);
+app.use(Order_Status_routes);
 
-app.get('/d',(req,res)=>{
+app.get('/pleasetestmerightnow',(req,res)=>{
   res.send('adsfadsf');
 })
 

@@ -26,7 +26,7 @@ const Role=DB.define('Role',{
     }
 
 },
-{freezeTableName:true,timestamps:true,tableName:"Roles"});
+{freezeTableName:true,timestamps:true,tableName:"roles"});
 Role.role_types=['status','role'];
 
 module.exports=Role;

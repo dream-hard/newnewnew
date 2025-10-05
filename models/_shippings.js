@@ -32,22 +32,23 @@ const Shipping= DB.define('Shipping',
         references:{
             model:"shipping_methods",
             key:"id"
-        }
+        },
+            onUpdate:"CASCADE",
     },tracknumber:{
         type:DataTypes.STRING(50),
         unique:true,
     },
     cost:{
-        type:DataTypes.DECIMAL(10,2),
+        type: DataTypes.DECIMAL(20, 10), 
         allowNull:true,
     },
-        shipping_date:{
+    shipping_date:{
             type:DataTypes.DATEONLY,
             allowNull:true,
 
 
     }
-    ,   dlivered_date:{
+    ,dlivered_date:{
             type:DataTypes.DATEONLY,
             allowNull:true,
 

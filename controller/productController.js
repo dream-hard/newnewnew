@@ -212,7 +212,6 @@ exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.query;
 
-        console.log(req.body)
 
         // 1️⃣ Find the product
         const product = await Product.findByPk(id);
@@ -234,7 +233,6 @@ exports.deleteProduct = async (req, res) => {
         res.status(200).json({ message: "Product and all associated images deleted successfully" });
 
     } catch (err) {
-        console.error(err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -306,7 +304,6 @@ exports.getallproductsbyids= async (req, res) => {
       totalItems:  count,
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -474,7 +471,6 @@ if (attribute_option_ids.length > 0) {
     });
 
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -568,7 +564,6 @@ if (attribute_option_ids.length > 0) {
     });
 
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -632,7 +627,6 @@ exports.searchProductsByTitle = async (req, res) => {
       totalPages: Math.ceil(count / limit)
     });
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -818,7 +812,6 @@ exports.updateProductWithImages = async (req, res) => {
         res.status(200).json({ message: "Product updated successfully", product, images: finalImages });
 
     } catch (err) {
-        console.error(err);
         // remove uploaded files on error
         if (req.files) {
             for (let f of req.files) {
@@ -946,7 +939,7 @@ exports.justgettheall=async(req,res)=>{
 
 
 exports.filterproducts=async(req,res)=>{
-  
+
   try {
     let {
       page=1,
@@ -994,7 +987,7 @@ if (user_id) where.user_id = user_id;
 if (status_id) where.status_id = status_id;
 if (condition_id) where.condition_id = condition_id;
 if (currency) where.currency_id = currency;
-if (title) where.title = { [Op.like]: `%${title}%` };
+if (title ) where.title = { [Op.like]: `%${title}%` };
 if (product_slug) where.slug = { [Op.like]: `%${product_slug}%` };
 if (quantity_foryou !== undefined && quantity_dir) {
   switch (quantity_dir) {
@@ -1045,7 +1038,7 @@ if (price !== undefined && price_dir) {
     case "eq": where.price = { [Op.eq]: price }; break;
     case "gte": where.price = { [Op.gte]: price }; break;
     case "lte": where.price = { [Op.lte]: price }; break;
-    case "gt": where.price = { [Op.gt]: price }; break;
+    case "gt": where.price = { [Op.gt]: price };break;
     case "lt": where.price = { [Op.lt]: price }; break;
     default :where.price = { [Op.eq]: price }; break;
   }
@@ -1071,8 +1064,6 @@ if (warranty !== undefined) where.warranty = warranty;
 if (latest !== undefined) where.latest = latest;
 if (discount !== undefined) where.discount = discount;
 
-if (price) where.price = { [Op.lte]: price }; // products less than or equal to given price
-if (original_price) where.original_price = { [Op.lte]: original_price };
 
 if (softdelete !== undefined) where.softdelete = softdelete;
     let rootCats=[];
@@ -1123,7 +1114,7 @@ if (softdelete !== undefined) where.softdelete = softdelete;
       model: Category,
       where:categoryWhere,
       required: true,
-      attributes: [ 'name', 'slug',"uuid"]
+      attributes: [ "display_name",'name', 'slug',"uuid"]
     },
     {
       model: Currency,
@@ -1166,10 +1157,8 @@ if (attribute_option_ids && attribute_option_ids.length > 0) {
       distinct: true
     ,raw:false
   };
-
   const { count, rows } = await Product.findAndCountAll(queryOptions);
   
-  if(!count || !rows)return res.status(404).json({error:"didn't found any product",msg:""});
   return res.status(200).json({
       products: rows,
       total: count,
@@ -1213,7 +1202,6 @@ exports.justtheproduct = async (req, res) => {
       product: productData,
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -1254,10 +1242,10 @@ exports.justgettheproudctbyslug = async (req, res) => {
     const product = await Product.findOne({
       where: { slug: slug},
       include: [
-        { model: Category, attributes: ["uuid", "name", "slug","softdelete"] },
+        { model: Category, attributes: [ "display_name", "slug"] },
         { model: Currency, attributes: ["currency_iso", "symbol","name"] },
         { model: Product_image, attributes: ["id","filename", "image_type","disk_filename"] },
-        { model: User, attributes: ["name","username","role_id","status_id", "email", "phone_number"] }
+        { model: User, attributes: ["username", "phone_number"] }
         ,{model: Product_condition},{model: Product_statu}
         ,{model : Product_attribute, attributes:['is_filteractive',"id"],include:[{model:Attribute_option ,attributes:["id","name"],include:[{model:Attribute_type,attributes:["id",'name']}]}] }
 
@@ -1267,7 +1255,6 @@ exports.justgettheproudctbyslug = async (req, res) => {
     });
     if (!product) return res.status(404).json({ error: "Product not found" ,msg:""});
     const productData = product;
-    console.log(product);
     res.json({
       succes: true,
       product: productData,

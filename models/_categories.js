@@ -22,7 +22,9 @@ const Category=DB.define("Category",{
         references:{
             model:"categories",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     display_name:{
         type:DataTypes.STRING,

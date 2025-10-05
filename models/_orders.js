@@ -23,8 +23,9 @@ const Order=DB.define('Order',{
             model:"users",
             key:"uuid"
         },
+        onDelete: 'CASCADE',
+            onUpdate:"CASCADE",
         validate:{
-            isUUID:true,
             notEmpty:true,
             notNull:true,
         }
@@ -32,11 +33,14 @@ const Order=DB.define('Order',{
     },
     shipping_address_id:{
         type:DataTypes.INTEGER,
-        allowNull:false,
+        allowNull:true,
         references:{
             model:"addresses",
             key:"id"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
+        
     },
     status_id:{
         type:DataTypes.INTEGER,
@@ -49,7 +53,9 @@ const Order=DB.define('Order',{
         references:{
             model:"order_status",
             key:"id",
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     order_date:{
         type:DataTypes.DATE,

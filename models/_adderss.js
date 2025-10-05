@@ -24,7 +24,14 @@ const Address=DB.define("Address",{
         references:{
             model:'addresses',
             key:"id"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
+    },
+    cost:{
+        type: DataTypes.DECIMAL(20, 10), 
+        allowNull: false,
+        defaultValue:0.00
     },
     forfree:{
         type:DataTypes.BOOLEAN,

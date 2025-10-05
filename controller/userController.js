@@ -9,7 +9,6 @@ const bcrypt=require("bcryptjs");
 
 
 exports.create = async (req, res) => {
-  console.log(req.body)
   try {
     let {username,email,bio,profile_pic}=req.body;
     const {name ,phoneNumber,password,role_id,status_id}=req.body;
@@ -241,83 +240,64 @@ dotenv.config();
 
 exports.login= async (req,res)=>{
     try {
-
         const {phoneNumber,email,password}=req.body;
-        console.log(req.body)
-        let user;
-        if(email || phoneNumber){
-          if(email && email.lenght!==0){
-             user= await User.findOne({
-              where:{
-                  email:email       
-                  }
-              });
-          }else{ 
-               user= await User.findOne({
-              where:{
-                  phone_number:phoneNumber       
-                  }
-              });
-            
-          }
-          
-        }else{
-          return res.status(404).json({err:"please retry",msg:"please send email or phone number"})
+        if ((!email || email.trim() === '') && (!phoneNumber || phoneNumber.trim() === '')) {
+          return res.status(400).json({ msg: 'Please send email or phoneNumber' });
         }
-       
+        if (!password || password.trim() === '') {
+          return res.status(400).json({ msg: 'Password is required' });
+        }
+        let user;
+        if(email && email.trim().length > 0) {
+           user= await User.findOne({where:{email:email}});
+        }else{ 
+            user= await User.findOne({where:{phone_number:phoneNumber}});
+        }
         if(!user) return res.status(404).json({msg:"User was not found",err:"invalid  email or phone number"});
-
-        const vaildpass=bcrypt.compareSync(password,user.passwordhash);
-        console.log(vaildpass);
+        const vaildpass= await bcrypt.compareSync(password,user.passwordhash);
         if(!vaildpass) return res.status(401).json({msg:"not vaild password",err:""});
-            
         user.role=await Role.findByPk(user.role_id);
+        const tokenPayload={phoneNumber:user.phone_number,role:user.role,id:user.uuid,name:user.name};
+        const accessToken =genratauth(tokenPayload);
+        const refreshToken=genratreauth(tokenPayload);
+        const isProd = process.env.NODE_ENV === 'production';
+        res.cookie("refresh_token", refreshToken, {
+        httpOnly: true,
+        secure: isProd, // only over HTTPS
+        sameSite: "Strict", // or 'Lax' depending on your flow
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days,
+        path:'/'
+      });
 
-        const for_token={phoneNumber:user.phone_number,role:user.role,id:user.uuid,name:user.name};
-        const token=genratauth(for_token);
-        const retoken=genratreauth(for_token);
-
-    res.cookie("refresh_token", retoken, {
-    httpOnly: true,
-    secure: false, // only over HTTPS
-    sameSite: "Strict", // or 'Lax' depending on your flow
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
-
-      return  res.status(200).json({authtoken:token,msg:"login succes"});
+      return  res.status(200).json({authtoken:accessToken ,msg:"Login successful"});
     }catch (error) {
-      return  res.status(500).json({msg:"something went wrong",err:error.message});
+      return  res.status(500).json({msg:"something went wrong",error:error.message});
     }
 }
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////
 exports.iflogin=async(req,res,next)=>{
-        const newtoken=jwt.sign({email:req.user.email,id:req.user.id,hashpassword:req.user.hashpassword},process.env.SECRET_KEY,{expiresIn:"5s"});
-          return  res.status(200).json({authtoken:newtoken});
-    
+        const newtoken=genratauth(req.user)
+        return  res.status(200).json({authtoken:newtoken});
 };
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////
 
 exports.logout = async (req, res) => {
   try {
+    const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie("refresh_token", {
       httpOnly: true,
-      secure: false, // Change to true in production (with HTTPS)
-      sameSite: "Lax", // or "Strict" / "None" based on your setup
+      secure: isProd, 
+      sameSite: "Lax", 
+      path: '/'// or "Strict" / "None" based on your setup
     });
-
     return res.status(200).json({ msg: "تم تسجيل الخروج بنجاح" });
   } catch (error) {
     return res.status(500).json({ msg: "حدث خطأ غير متوقع", err: error.message });
   }
 };
 
-///////////////////////////////////////////////////////////////////////////////
+
 exports.Me= async (req,res,next)=>{
     try {
         const user =await User.findByPk(req.user.id,{
@@ -330,15 +310,14 @@ exports.Me= async (req,res,next)=>{
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////
 exports.refresh=async(req,res,next)=>{
 
-    const refreshtoken=req.cookies.refresh_token;  
-    if(refreshtoken===null|| refreshtoken==="") return res.status(400).json({msg:"not loged in",err:"please login"});
+    const refreshtoken=req.cookies?.refresh_token;  
+    if(refreshtoken===null|| refreshtoken===""||refreshtoken===undefined) return res.status(400).json({msg:"not logedin",error:"please login"});
     
+
     jwt.verify(refreshtoken,process.env.REFRESH_SECRET_KEY,(err,result)=>{
-        if(err)  return res.status(406).json({ message: 'Unauthorized',err:err.message });
+        if(err)  return res.status(406).json({ message: 'Unauthorized',error:err.message });
 
         const token=genratauth(result.result);
         
@@ -348,30 +327,12 @@ exports.refresh=async(req,res,next)=>{
 }
 
 function genratauth(result){
-    return jwt.sign({result:result},process.env.SECRET_KEY,{expiresIn:'7d'});
+    return jwt.sign({result:result},process.env.SECRET_KEY,{expiresIn:process.env.ACCESS_EXPIRES});
 }
 function genratreauth(result){
-
-    return jwt.sign({result:result},process.env.REFRESH_SECRET_KEY,{expiresIn:"1500s"});
+    return jwt.sign({result:result},process.env.REFRESH_SECRET_KEY,{expiresIn:process.env.REFRESH_EXPIRES});
 }
   
-
-// function auth (req){// it can be changed into the midelware headerauth.js
-
-
-//     const authH=req.headers['authorization']
-//     const token = authH && authH.split(' ')[1];
-//     if(token === null){
-//          return res.sendStatus(401).json({msg:"mustn't be null"});
-//     }
-//     jwt.verify(token,process.env.SECRET_KEY,(err,result)=>{
-//         if(err){
-//         return res.status(403).json({msg:"not valid jwt",err:err});
-//         } 
-//     req.user ={result:result.result};
-//     return;     
-//     });
-// }
 
 exports.singup= async (req,res)=>{
 
@@ -442,7 +403,6 @@ if (existingUser) {
   res.status(201).json(singup_user);
 }
   } catch (error) {
-              console.log(error);
 
     res.status(500).json({error:error.message});
   }

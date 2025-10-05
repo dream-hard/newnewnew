@@ -24,7 +24,7 @@ const Ads=DB.define("Ads",{
     link_path:{
         type:DataTypes.STRING,
         allowNull:false,
-        defaultValue:"/home",
+        defaultValue:"/",
     },
     photo_path:{
         type:DataTypes.STRING,
@@ -34,12 +34,17 @@ const Ads=DB.define("Ads",{
             notEmpty:true,
         }
     },
+    disk_filename:{
+        type:DataTypes.STRING,
+        allowNull:false,
+        unique:true,
+    },
     isvalid:{
         type:DataTypes.BOOLEAN,
         allowNull:false,
         defaultValue:0,   
     }
 },  
-{freezeTableName:true,timestamps:true,tableName:'Ads'});
+{freezeTableName:true,timestamps:true,tableName:'ads'});
 
 module.exports=Ads;

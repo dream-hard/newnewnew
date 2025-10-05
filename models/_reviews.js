@@ -10,7 +10,9 @@ const Review=DB.define("Review",{
         references:{
             model:"users",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     product_id:{
         type:DataTypes.UUID,
@@ -18,7 +20,9 @@ const Review=DB.define("Review",{
         references:{
             model:"products",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
 
     },
     rating:{

@@ -29,40 +29,40 @@ const Supplier = require('./_suppliers');
 const Supplier_shipment = require('./_supplier_shipment');
 const Supplier_shipment_detail = require('./_supplier_shipment_details');
 const Ads = require('./_ads');
+const CourseDetails = require('./course_details');
+const UsedDetails = require('./used_details');
+const ServiceDetails = require('./service_details');
 
 ////////////////////////////////////////
 
 Address.hasMany(Address, {
-    as: 'Children',
     foreignKey: 'parent_id'
 });
 
 Address.belongsTo(Address, {
-    as: 'Parent',
+
     foreignKey: 'parent_id'
 });
 //////////////////////////////////////
 
 User.belongsTo(Role, {
   foreignKey: 'role_id',
-  as: 'Role'
 });
 
 User.belongsTo(Role, {
   foreignKey: 'status_id',
-  as: 'Status'
 });
-Role.hasMany(User, { foreignKey: 'role_id', as: 'UsersWithRole' });
-Role.hasMany(User, { foreignKey: 'status_id', as: 'UsersWithStatus' });
+Role.hasMany(User, { foreignKey: 'role_id' });
+Role.hasMany(User, { foreignKey: 'status_id' });
 /////////////////////////////////////////////
-User.hasMany(User_coupon, { foreignKey: 'user_id', as: 'UserCoupons' });
-User_coupon.belongsTo(User, { foreignKey: 'user_id', as: 'User' });
+User.hasMany(User_coupon, { foreignKey: 'user_id' });
+User_coupon.belongsTo(User, { foreignKey: 'user_id' });
 
-Coupon.hasMany(User_coupon, { foreignKey: 'coupon_id', as: 'CouponUsers' });
-User_coupon.belongsTo(Coupon, { foreignKey: 'coupon_id', as: 'Coupon' });
+Coupon.hasMany(User_coupon, { foreignKey: 'coupon_id' });
+User_coupon.belongsTo(Coupon, { foreignKey: 'coupon_id' });
 
-User.belongsToMany(Coupon, { through: User_coupon, foreignKey: 'user_id', otherKey: 'coupon_id', as: 'Coupons' });
-Coupon.belongsToMany(User, { through: User_coupon, foreignKey: 'coupon_id', otherKey: 'user_id', as: 'Users' });
+User.belongsToMany(Coupon, { through: User_coupon, foreignKey: 'user_id', otherKey: 'coupon_id' });
+Coupon.belongsToMany(User, { through: User_coupon, foreignKey: 'coupon_id', otherKey: 'user_id' });
 ////////////////////////////////////////////////////
 
 Attribute_option.belongsTo(Attribute_type, {
@@ -76,47 +76,46 @@ Attribute_type.hasMany(Attribute_option, {
 //////////////////////////////////////////////////
 Category.belongsTo(Category, {
   foreignKey: 'parent_category_id',
-  as: 'ParentCategory'
 });
 
 Category.hasMany(Category, {
   foreignKey: 'parent_category_id',
-  as: 'Subcategories'
+
 });
 ////////////////////////////////////////////////////
 // Category → Category_attribute
-Category.hasMany(Category_attribute, { foreignKey: 'category_id', as: 'CategoryAttributes' });
-Category_attribute.belongsTo(Category, { foreignKey: 'category_id', as: 'Category' });
+Category.hasMany(Category_attribute, { foreignKey: 'category_id' });
+Category_attribute.belongsTo(Category, { foreignKey: 'category_id' });
 
 // Attribute_option → Category_attribute
-Attribute_option.hasMany(Category_attribute, { foreignKey: 'attribute_option_id', as: 'OptionCategories' });
-Category_attribute.belongsTo(Attribute_option, { foreignKey: 'attribute_option_id', as: 'AttributeOption' });
+Attribute_option.hasMany(Category_attribute, { foreignKey: 'attribute_option_id' });
+Category_attribute.belongsTo(Attribute_option, { foreignKey: 'attribute_option_id' });
 ///////////////////////////////////////////////////////////////
 
-Supplier.hasMany(Supplier_shipment, { foreignKey: 'supplier_id', as: 'Shipments' });
-Supplier_shipment.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'Supplier' });
+Supplier.hasMany(Supplier_shipment, { foreignKey: 'supplier_id' });
+Supplier_shipment.belongsTo(Supplier, { foreignKey: 'supplier_id' });
 ////////////////////////////////////////////////////////
-Supplier_shipment.hasMany(Supplier_shipment_detail, { foreignKey: 'supplier_shipment_id', as: 'ShipmentDetails' });
-Supplier_shipment_detail.belongsTo(Supplier_shipment, { foreignKey: 'supplier_shipment_id', as: 'SupplierShipment' });
+Supplier_shipment.hasMany(Supplier_shipment_detail, { foreignKey: 'supplier_shipment_id' });
+Supplier_shipment_detail.belongsTo(Supplier_shipment, { foreignKey: 'supplier_shipment_id' });
 
-Product.hasMany(Supplier_shipment_detail, { foreignKey: 'product_id', as: 'ShipmentDetails' });
-Supplier_shipment_detail.belongsTo(Product, { foreignKey: 'product_id', as: 'Product' });
+Product.hasMany(Supplier_shipment_detail, { foreignKey: 'product_id' });
+Supplier_shipment_detail.belongsTo(Product, { foreignKey: 'product_id' });
 //////////////////////////////////////////////////////////////////////
-Shipping.belongsTo(Shipping_method, { foreignKey: 'type', as: 'ShippingMethod' });
-Shipping_method.hasMany(Shipping, { foreignKey: 'type', as: 'Shippings' });
+Shipping.belongsTo(Shipping_method, { foreignKey: 'type' });
+Shipping_method.hasMany(Shipping, { foreignKey: 'type' });
 
 /////////////////////////////////////////////////////
-Review.belongsTo(User, { foreignKey: 'user_id', as: 'User' });
-User.hasMany(Review, { foreignKey: 'user_id', as: 'Reviews' });
+Review.belongsTo(User, { foreignKey: 'user_id' });
+User.hasMany(Review, { foreignKey: 'user_id' });
 
-Review.belongsTo(Product, { foreignKey: 'product_id', as: 'Product' });
-Product.hasMany(Review, { foreignKey: 'product_id', as: 'Reviews' });
+Review.belongsTo(Product, { foreignKey: 'product_id' });
+Product.hasMany(Review, { foreignKey: 'product_id' });
 /////////////////////////////////////////////////////////
 Product.belongsTo(User, { foreignKey: 'user_id' });
 User.hasMany(Product, { foreignKey: 'user_id' });
 
-Product.belongsTo(Category, { foreignKey: 'category_id', targetKey: 'uuid' });
-Category.hasMany(Product, { foreignKey: 'category_id', sourceKey: 'uuid' });
+Product.belongsTo(Category, { foreignKey: 'category_id' });
+Category.hasMany(Product, { foreignKey: 'category_id' });
 
 Product.belongsTo(Product_statu, { foreignKey: 'status_id' });
 Product_statu.hasMany(Product, { foreignKey: 'status_id' });
@@ -124,44 +123,89 @@ Product_statu.hasMany(Product, { foreignKey: 'status_id' });
 Product.belongsTo(Product_condition, { foreignKey: 'condition_id' });
 Product_condition.hasMany(Product, { foreignKey: 'condition_id' });
 
-Product.belongsTo(Currency, { foreignKey: 'currency_id' });
-Currency.hasMany(Product, { foreignKey: 'currency_id' });
+Product.belongsTo(Currency, { foreignKey: 'currency_id' ,
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",});
+Currency.hasMany(Product, { foreignKey: 'currency_id',
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE", });
 ////////////////////////////////////////////////////
 Product.hasMany(Product_image, { foreignKey: 'product_id', });
-Product_image.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product_image.belongsTo(Product, { foreignKey: 'product_id'});
 /////////////////////////////////////////////////
-Product_attribute.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product_attribute.belongsTo(Product, { foreignKey: 'product_id' });
 Product.hasMany(Product_attribute, { foreignKey: 'product_id',  });
 Product_attribute.belongsTo(Attribute_option, { foreignKey: 'attribute_option_id', });
-Attribute_option.hasMany(Product_attribute, { foreignKey: 'attribute_option_id', as: 'productAttributes' });
+Attribute_option.hasMany(Product_attribute, { foreignKey: 'attribute_option_id' });
 ///////////////////////////////////////////////////////
-User.hasMany(Order, { foreignKey: 'user_id', as: 'orders' });
-Order.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(Order, { foreignKey: 'user_id' });
+Order.belongsTo(User, { foreignKey: 'user_id' });
 
-Address.hasMany(Order, { foreignKey: 'shipping_address_id', as: 'orders' });
-Order.belongsTo(Address, { foreignKey: 'shipping_address_id', as: 'shipping_address' });
+Address.hasMany(Order, { foreignKey: 'shipping_address_id' });
+Order.belongsTo(Address, { foreignKey: 'shipping_address_id' });
 
-Order_statu.hasMany(Order, { foreignKey: 'status_id', as: 'orders' });
-Order.belongsTo(Order_statu, { foreignKey: 'status_id', as: 'status' });
+Order_statu.hasMany(Order, { foreignKey: 'status_id' });
+Order.belongsTo(Order_statu, { foreignKey: 'status_id' });
 ////////////////////////////////////////////////////////////////
-Order.hasMany(Order_detail, { foreignKey: 'order_id', as: 'order_details' });
-Order_detail.belongsTo(Order, { foreignKey: 'order_id', as: 'order' });
+Order.hasMany(Order_detail, { foreignKey: 'order_id' });
+Order_detail.belongsTo(Order, { foreignKey: 'order_id' });
 
-Product.hasMany(Order_detail, { foreignKey: 'product_id', as: 'order_details' });
-Order_detail.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(Order_detail, { foreignKey: 'product_id' ,
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",});
+Order_detail.belongsTo(Product, { foreignKey: 'product_id',
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE", });
 ////////////////////////////////////////////////////////////////////////
-Currency.hasMany(Exchange_rate, { foreignKey: 'base_currency_id', as: 'base_exchange_rates' });
-Currency.hasMany(Exchange_rate, { foreignKey: 'target_currency_id', as: 'target_exchange_rates' });
+  Currency.hasMany(Exchange_rate, {
+    foreignKey: "base_currency_id",
+    sourceKey: "currency_iso",
+    as: "baseCurrency",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
 
-Exchange_rate.belongsTo(Currency, { foreignKey: 'base_currency_id', as: 'base_currency' });
-Exchange_rate.belongsTo(Currency, { foreignKey: 'target_currency_id', as: 'target_currency' });
+  // و many exchange rates كـ target
+  Currency.hasMany(Exchange_rate, {
+    foreignKey: "target_currency_id",
+    sourceKey: "currency_iso",
+    as: "targetRates",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
+  Exchange_rate.belongsTo(Currency, {
+    foreignKey: "base_currency_id",
+    targetKey: "currency_iso",   // Currency.currency_iso هو الـ PK عندك
+    as: "baseCurrency",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
+
+  // ربط إلى Currency كـ targetCurrency
+  Exchange_rate.belongsTo(Currency, {
+    foreignKey: "target_currency_id",
+    targetKey: "currency_iso",
+    as: "targetCurrency",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
 ////////////////////////////////////////////////////////////////
 Product.hasMany(Coupon, { foreignKey: 'product_id' });
 Coupon.belongsTo(Product, { foreignKey: 'product_id' });
 //////////////////////////////////////////////
 
-Order.hasOne(Shipping,{foreignKey:"order_id",as:"order"});
-Shipping.belongsTo(Order,{foreignKey:"order_id",as:'order'});
+Order.hasOne(Shipping,{foreignKey:"order_id"});
+Shipping.belongsTo(Order,{foreignKey:"order_id"});
+
+/////////////////////////////////////////////////////////////
+Product.hasOne(CourseDetails, { foreignKey: 'product_id' });
+CourseDetails.belongsTo(Product, { foreignKey: 'product_id' });
+
+Product.hasOne(UsedDetails, { foreignKey: 'product_id' });
+UsedDetails.belongsTo(Product, { foreignKey: 'product_id' });
+
+Product.hasOne(ServiceDetails, { foreignKey: 'product_id' });
+ServiceDetails.belongsTo(Product, { foreignKey: 'product_id' });
 
 
 
@@ -192,7 +236,10 @@ const models = {
   Supplier,
   Supplier_shipment,
   Supplier_shipment_detail,
-  Ads
+  Ads,
+  CourseDetails,
+  UsedDetails,
+  ServiceDetails
 };
 
 

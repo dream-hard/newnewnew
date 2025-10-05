@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const Supplier_shipment = require("../models/_supplier_shipment");
 const Supplier = require("../models/_suppliers");
 const { update } = require("./categoryController");
@@ -130,7 +131,7 @@ exports.updatewithuuid=async (req,res)=>{
 
 exports.delete = async (req, res) => {
   try {
-    const {id}=req.body;
+    const {id}=req.query;
     const deleted = await Supplier.destroy({ where: { uuid: id } });
     if (!deleted) return res.status(404).json({ error: "Not found" });
     res.json({ message: "Deleted successfully" });
@@ -169,6 +170,8 @@ exports.getsuppliers=async (req,res)=>{
       "phone-desc": [["phone_number", "DESC"]],
       "address-asc": [["address", "ASC"]],
       "address-desc": [["address", "DESC"]],
+      "uuid-desc":[["uuid","DESC"]],
+      "uuid-ASC":[["uuid","ASC"]]
     };
 
     if (orderBy && orderMap[orderBy]) {
@@ -189,14 +192,15 @@ exports.getsuppliers=async (req,res)=>{
       ,currentPage:Number(page)
       ,totalPages:Math.ceil((Array.isArray(count) ? count.length : count) / limit)});
   } catch (error) {
-    console.error(error);
     res.status(500).json({ message: "Error fetching suppliers" });
   }
 }
 exports.searchsuppliers = async(req,res)=>{
  try {
-    const { id, name, address, phoneNumber, orderBy ,limit=10,page=1} = req.query;
-
+    let { id, name, address, phoneNumber, orderBy ,limit=10,page=1} = req.body;
+    
+    page=Number(page);limit=Number(limit);
+    const offset= (page -1 )*limit;
     // ----------- WHERE (search filters) -----------
     const where = {};
 
@@ -228,6 +232,8 @@ exports.searchsuppliers = async(req,res)=>{
       "phone-desc": ["phone_number", "DESC"],
       "address-asc": ["address", "ASC"],
       "address-desc": ["address", "DESC"],
+      "uuid-desc":[["uuid","DESC"]],
+      "uuid-ASC":[["uuid","ASC"]]
     };
 
     if (orderBy && orderMap[orderBy]) {
@@ -236,24 +242,21 @@ exports.searchsuppliers = async(req,res)=>{
 
     // ----------- QUERY -----------
     
-    const {count,rows} = await Supplier.findAll({
+    const {count,rows} = await Supplier.findAndCountAll({
       attributes:["uuid","name","phone_number","address"],
       offset,
       limit,
-
       where,
       order,
     });
 
-
     res.status(200).json({
-      succes:true
+       succes:true
       ,suppliers:rows
       ,total:Array.isArray(count) ? count.length : count
       ,currentPage:Number(page)
       ,totalPages:Math.ceil((Array.isArray(count) ? count.length : count) / limit)});  }
        catch (error) {
-    console.error(error);
     res.status(500).json({ message: "Error searching suppliers" });
   }
 } 
@@ -268,7 +271,6 @@ exports.getsupplier=async(req,res)=>{
 
     res.status(200).json({succes:true,supplier:supplier});
   } catch (error) {
-        console.error(error);
     res.status(500).json({ message: "Error searching supplier" });
   }
 }
@@ -294,9 +296,9 @@ exports.getsupplierwithshipments=async(req,res)=>{
   }
 }
 exports.updatedsupplier=async(req,res)=>{
-  const {id ,name,phoneNumber,address,metadata,createdat,updatedat }=req.body;
+  let {id ,name,phoneNumber,address,metadata,createdat,updatedat }=req.body;
   try {
-    if(!id ||name||phoneNumber||address)return res.status(400).json({error:"an error found"}); 
+    if(!id )return res.status(400).json({error:"an error found"}); 
     let update_options={
       name:name,
       phone_number:phoneNumber,
@@ -319,12 +321,12 @@ exports.updatedsupplier=async(req,res)=>{
 
 exports.createsupplier = async (req, res) => {
   try {
-    const {name,phoneNumber,address,metadata}=req.body;
+    const {name,phone_number,address,metadata}=req.body;
 
     const supplier = await Supplier.create(
         {
             name,
-            phone_number:phoneNumber,
+            phone_number,
             address,
             metadata,
 
@@ -333,7 +335,7 @@ exports.createsupplier = async (req, res) => {
     );
     if(!supplier)res.status(401).json({error:"retry again please"});
 
-    res.status(201).json(detail);
+    res.status(201).json(supplier);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

@@ -15,7 +15,9 @@ const Exchange_rate=DB.define("Exchange_rate",{
           references:{
             model:"currencies",
             key:"currency_iso"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     target_currency_id:{
         type:DataTypes.CHAR(3),
@@ -28,10 +30,12 @@ const Exchange_rate=DB.define("Exchange_rate",{
         references:{
             model:"currencies",
             key:"currency_iso"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     exchange_rate:{
-        type: DataTypes.DECIMAL(15,8),
+        type: DataTypes.DECIMAL(20, 10), 
         allowNull:false,
         validate:{
             notEmpty:true,
@@ -41,7 +45,8 @@ const Exchange_rate=DB.define("Exchange_rate",{
     ,dateofstart:{
         type:DataTypes.DATEONLY,
         allowNull:false,
-          defaultValue:  new Date()      ,  // or some valid date
+        primaryKey:true,
+          defaultValue:  Sequelize.NOW,  // or some valid date
 
         validate:{
             notEmpty:true,

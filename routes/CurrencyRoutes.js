@@ -8,7 +8,7 @@ const router=express.Router();
 
 router.get('/currency/justgetall',CurrencyController.justgetall);
 router.get('/currency/getAllCurrencies',CurrencyController.getAllCurrencies);
-router.get('/currency/getCurrencyByIso',CurrencyController.getCurrencyByIso);
+router.post('/currency/getCurrencyByIso',CurrencyController.getCurrencyByIso);
 router.post('/currency/searchcurrency',CurrencyController.searchcurrency);
 router.post('/currency/create/createCurrency',varifay,checkPermission(["super_admin","Owner"]),CurrencyController.createCurrency);
 router.patch('/currency/update/updateCurrency',varifay,checkPermission(["super_admin","Owner"]),CurrencyController.updateCurrency)

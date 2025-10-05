@@ -232,7 +232,6 @@ const buildCategoryMap = (categories) =>{
 const getParentChain = (id, allCatsMap) => {
   const chain = [];
   let current = allCatsMap[id];
-  console.log(id);
   while (current && current.parent_category_id !== null) {
     const parent = allCatsMap[current.parent_category_id];
   
@@ -311,7 +310,6 @@ const childrenMap = allCats.reduce((map, cat) => {
   return map;
 }, {});
   let all;
-  console.log(buildChildrenMap(allCats));
 
 
   if((id===null||id===undefined)||id===""){
@@ -462,7 +460,7 @@ exports.filtercategories=async(req,res)=>{
     const offset=(page-1)*limit;
     let order=orderMap[orderby]||orderMap["created-desc"];
     const {count,rows}=await Category.findAndCountAll({order,limit,offset,where});
-    if(!count|| !rows )return res.status(404).json({error:"not fount any categories",msg:""});
+    if(!count|| !rows )return res.status(404).json({error:"not found any categories",msg:""});
     res.status(200).json({   
       succes:true,
       categories:rows

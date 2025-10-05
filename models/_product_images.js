@@ -16,7 +16,9 @@ const Product_image=DB.define("Product_image",{
         references:{
             model:"products",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     image_type:{
         type:DataTypes.ENUM("main","sup"),

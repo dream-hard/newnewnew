@@ -22,7 +22,6 @@ const orderMap = {
 const createCurrency = async (req, res) => {
   try {
     const {iso,name,symbol}=req.body;
-
     const currency = await Currency.create(
       {
         currency_iso:iso,
@@ -30,8 +29,22 @@ const createCurrency = async (req, res) => {
         symbol
       }
     );
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0"); // months start from 0
+    const dd = String(today.getDate()).padStart(2, "0");
+
+    const sqlDate = `${yyyy}-${mm}-${dd}`;
+    const exchange_rate=await Exchange_rate.create({
+      base_currency_id:currency.currency_iso,
+      target_currency_id:currency.currency_iso,
+      exchange_rate:1.00,
+      dateofstart:sqlDate,
+    })
     res.status(201).json({succes:true,msg:"the currency has been add succseful"});
   } catch (error) {
+
     res.status(500).json({ error: error.message });
   }
 };
@@ -96,7 +109,7 @@ const updateCurrency = async (req, res) => {
 
 const deleteCurrency = async (req, res) => {
   try {
-    const {iso}=req.body;
+    const { iso } = req.query;
     const deleted = await Currency.destroy({
       where: { currency_iso: iso },
     });

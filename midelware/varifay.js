@@ -6,11 +6,8 @@ const jwt=require("jsonwebtoken");
 require('dotenv').config();
 
 exports.varifay= async (req,res,next)=> {
-    
-  const retoken = req.cookies.refresh_token;
-
-    console.log(retoken)
-    if(!retoken || retoken===""){ return res.status(400).json({msg:"not loged in",err:""});}
+    const retoken = req.cookies.refresh_token;
+    if(!retoken || retoken===""){ return res.status(400).json({error:"not loged in",msg:"not loged in"});}
     try {
         let valid=true;
         jwt.verify(retoken,process.env.REFRESH_SECRET_KEY,(err,result)=>{
@@ -21,13 +18,14 @@ exports.varifay= async (req,res,next)=> {
         });
         if(valid)  {     
                 const response= await User.findByPk(req.user.id);
-                if(!response) return(()=>{{ return res.status(400).json({err});}});
+                if(!response) return(()=>{{ return res.status(400).json({error:"this acount was not found please try again",msg:""});}});
                 next();
         }
         else{
-        return res.status(406).json({msg:"Unauthreized",err:""});
+            res.clearCookie('refresh_token', { path: '/' });
+            return res.status(400).json({error:"your LOGIN has expired  please RE LOGIN",msg:""});
         }
     } catch (error) {
-        return res.status(406).json({msg:"Unauthreized",err:""});
+        return res.status(500).json({error:error,msg:""});
     }
 }

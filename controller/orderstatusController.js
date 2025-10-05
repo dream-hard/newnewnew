@@ -1,5 +1,4 @@
-const Order_statu = require('../models/_order_status.js');
-const { Order } = require('../models/index.js');
+const { Order ,Order_statu } = require('../models/index.js');
 
 exports.create = async (req, res) => {
   try {
@@ -14,8 +13,9 @@ exports.create = async (req, res) => {
 
 exports.getAll = async (req, res) => {
   try {
-    const statuses = await Order_statu.findAll();
-    res.json(statuses);
+    const statuses = await Order_statu.findAll({raw:true});
+
+    res.status(200).json(statuses);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -79,8 +79,7 @@ exports.deletewithoutid=async (req,res)=>{
 
 exports.justgetall=async(req,res)=>{
   try {
-    const order_status=await Order_statu.findAll({attributes:["id","statu"],raw:true });
-
+    const order_status=await Order_statu.findAll({attributes:["id","statu"] });
     res.status(200).json (order_status);
   } catch (error) {
      res.status(500).json({ error: error.message });

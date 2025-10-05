@@ -159,7 +159,6 @@ exports.updateOrCreateImages = async (req, res) => {
         });
 
     } catch (err) {
-        console.error(err);
 
         // Remove uploaded files if something fails
         if (req.files) {
@@ -187,7 +186,6 @@ exports.deleteProductImage = async (req, res) => {
         await image.destroy();
         res.status(200).json({ message: "Image deleted" });
     } catch (err) {
-        console.error(err);
         res.status(500).json({ message: err.message });
     }
 };

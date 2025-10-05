@@ -105,7 +105,7 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   try {
-    const {id}=req.body;
+    const {id}=req.query;
     const deleted = await Supplier_shipment_detail.destroy({ where: { id: id } });
     if (!deleted) return res.status(404).json({ error: "Not found" });
     res.json({ message: "Deleted successfully" });
@@ -175,7 +175,6 @@ exports.getShipmentDetails = async (req, res) => {
       details: rows,
     });
   } catch (err) {
-    console.error("Error fetching shipment details:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -259,7 +258,6 @@ exports.searchinDetails = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Error searching details:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -293,7 +291,6 @@ exports.updateShipmentDetail = async (req, res) => {
       detail,
     });
   } catch (err) {
-    console.error("Error updating detail:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -312,7 +309,7 @@ exports.getDetailsByShipment = async (req, res) => {
 
     const { count, rows } = await Supplier_shipment_detail.findAndCountAll({
       where: { supplier_shipment_id: shipment_id },
-      include:[{ model: Product, as: "product" ,attributes:["category_id","user_id","title"],include:[{model:Product_image, attributes:["filename"],where:{image_type:"main"}}]},],
+      include:[{ model: Product, as: "Product" ,attributes:["category_id","user_id","title"],include:[{model:Product_image, attributes:["filename"],where:{image_type:"main"}}]},],
       order,
       limit,
       offset,
@@ -326,7 +323,6 @@ exports.getDetailsByShipment = async (req, res) => {
       details: rows,
     });
   } catch (err) {
-    console.error("Error fetching details by shipment:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -367,7 +363,6 @@ exports.getDetailsBySupplier = async (req, res) => {
       details: rows,
     });
   } catch (err) {
-    console.error("Error fetching details by supplier:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -407,7 +402,6 @@ exports.getDetailsByProduct = async (req, res) => {
       details: rows,
     });
   } catch (err) {
-    console.error("Error fetching details by product:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -464,8 +458,7 @@ exports.addShipmentDetail = async (req, res) => {
       detail: newDetail,
     });
   } catch (err) {
-    console.error("Error creating shipment detail:", err);
-    return res.status(500).json({ message: "Server error", error: err.message });
+=    return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
@@ -474,51 +467,107 @@ exports.addShipmentDetail = async (req, res) => {
 exports.bulkCreateDetails = async (req, res) => {
   try {
     const { details } = req.body; // array of shipment detail objects
-
     if (!details || !Array.isArray(details) || details.length === 0) {
       return res.status(400).json({ message: "details array is required" });
     }
 
     // Smart calculation for unit_cost / total_cost per detail
-    const processedDetails = details.map(d => {
-      const {
-        supplier_shipment_id,
-        product_id,
-        quantity,
-        unit_cost,
-        total_cost,
-        quantity_paid=0,
-        paid=0,
-        date_received,
-        currency="USD"
-      } = d;
-      if (!supplier_shipment_id) return null;
-      if (!product_id)return null;
-      if (!quantity) return null;
-      if(!unit_cost &&!total_cost) return null;
+    // const processedDetails = details.map(d => {
+    //   const {
+    //     supplier_shipment_id,
+    //     product_id,
+    //     quantity,
+    //     unit_cost,
+    //     total_cost,
+    //     quantity_paid=0,
+    //     paid=0,
+    //     date_received,
+    //     currency="USD"
+    //   } = d;
+    //   if (!supplier_shipment_id) return null;
+    //   if (!product_id)return null;
+    //   if (!quantity) return null;
+    //   if(!unit_cost &&!total_cost) return null;
     
-      let finalUnitCost = unit_cost || null;
-      let finalTotalCost = total_cost || null;
+    //   let finalUnitCost = unit_cost || null;
+    //   let finalTotalCost = total_cost || null;
 
-      if (quantity && unit_cost && !total_cost) {
-        finalTotalCost = quantity * unit_cost;
-      } else if (quantity && total_cost && !unit_cost) {
-        finalUnitCost = total_cost / quantity;
+    //   if (quantity && unit_cost && !total_cost) {
+    //     finalTotalCost = quantity * unit_cost;
+    //   } else if (quantity && total_cost && !unit_cost) {
+    //     finalUnitCost = total_cost / quantity;
         
-      }else{if(total_cost && unit_cost){finalUnitCost=unit_cost;finalTotalCost=total_cost}}
+    //   }else{if(total_cost && unit_cost){finalUnitCost=unit_cost;finalTotalCost=total_cost}}
 
-      return {
-        supplier_shipment_id: supplier_shipment_id,
-        product_id: product_id ,
-        quantity: quantity,
-        unit_cost: finalUnitCost,
-        total_cost: finalTotalCost,
-        quantity_paid: quantity_paid,
-        paid: paid,
-        date_received: date_received |null,
-        currency:currency,
-      };
-    });
+    //   return {
+    //     supplier_shipment_id: supplier_shipment_id,
+    //     product_id: product_id ,
+    //     quantity: quantity,
+    //     unit_cost: finalUnitCost,
+    //     total_cost: finalTotalCost,
+    //     quantity_paid: quantity_paid,
+    //     paid: paid,
+    //     date_received: date_received |null,
+    //     currency:currency,
+    //   };
+    // });
+    const processedDetails = details.map(d => {
+  const {
+    supplier_shipment_id,
+    product_id,
+    // قد تَجي كسلاسل، خلينا نحاول نحول للأرقام لما لازم
+    quantity,
+    unit_cost,
+    total_cost,
+    quantity_paid = 0,
+    paid = 0,
+    date_received,
+    currency = "USD"
+  } = d;
+
+  // validation: لازم نفحص null/undefined وليس falsy
+  if (supplier_shipment_id === undefined || supplier_shipment_id === null || supplier_shipment_id === "") return null;
+  if (!product_id) return null; // product_id كـ uuid/string => empty string invalid
+  // quantity ممكن يكون 0؟ غالباً لا — لو 0 غير مقبول فابقى هالتحقق، وإلا عدّله
+  if (quantity === undefined || quantity === null || quantity === "") return null;
+
+  // نحوّل الأعداد بشكل آمن
+  const qty = Number(quantity);
+  const unit = unit_cost === "" || unit_cost === null || unit_cost === undefined ? null : Number(unit_cost);
+  const total = total_cost === "" || total_cost === null || total_cost === undefined ? null : Number(total_cost);
+
+  // إذا كنت تسمح بالقيم 0، ما تستخدم !unit و !total كما قبل
+  if ((unit === null || Number.isNaN(unit)) && (total === null || Number.isNaN(total))) {
+    // ما في لا unit ولا total -> invalid
+    return null;
+  }
+
+  // استنتاج واحد من الاخر اذا مفقود
+  let finalUnitCost = unit;
+  let finalTotalCost = total;
+
+  if (!Number.isNaN(qty) && finalUnitCost !== null && (finalTotalCost === null || Number.isNaN(finalTotalCost))) {
+    finalTotalCost = qty * finalUnitCost;
+  } else if (!Number.isNaN(qty) && finalTotalCost !== null && (finalUnitCost === null || Number.isNaN(finalUnitCost))) {
+    finalUnitCost = finalTotalCost / qty;
+  } else if (finalUnitCost !== null && finalTotalCost !== null) {
+    // keep as-is
+  }
+
+  return {
+    supplier_shipment_id: supplier_shipment_id,
+    product_id: product_id,
+    quantity: qty,
+    unit_cost: finalUnitCost,
+    total_cost: finalTotalCost,
+    quantity_paid: Number(quantity_paid || 0),
+    paid: Number(paid || 0),
+    date_received: date_received ?? null,
+    currency: currency ?? "USD",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+});
 
     const newDetails = await Supplier_shipment_detail.bulkCreate(processedDetails);
 
@@ -528,7 +577,7 @@ exports.bulkCreateDetails = async (req, res) => {
       details: newDetails,
     });
   } catch (err) {
-    console.error("Error bulk creating details:", err);
+
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -574,7 +623,6 @@ exports.bulkUpdateDetails = async (req, res) => {
       updatedDetails: results,
     });
   } catch (err) {
-    console.error("Error bulk updating details:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };

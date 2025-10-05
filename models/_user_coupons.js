@@ -13,7 +13,9 @@ const User_coupon=DB.define("User_coupon",
             references:{
                 model:"users",
                 key:"uuid"
-            }
+            },
+            onDelete: 'CASCADE',
+            onUpdate:"CASCADE",
         },
         coupon_id:{
             type:DataTypes.STRING,
@@ -21,7 +23,9 @@ const User_coupon=DB.define("User_coupon",
             references:{
                 model:"coupons",
                 key:'code'
-            }
+            },
+            onDelete: 'CASCADE',
+            onUpdate:"CASCADE",
         },
         usage_count:{
             type:DataTypes.INTEGER,

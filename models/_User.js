@@ -90,7 +90,9 @@ const User=DB.define('User',{
         ,  references:{
             model:"roles",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     }
     ,Profile_pic:{
         type:DataTypes.STRING,

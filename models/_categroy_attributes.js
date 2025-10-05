@@ -24,7 +24,9 @@ const Category_attribute=DB.define("Category_attribute",{
         references:{
             model:"categories",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     attribute_option_id:{
         type:DataTypes.INTEGER,
@@ -32,7 +34,9 @@ const Category_attribute=DB.define("Category_attribute",{
         references:{
             model:"attribute_options",
             key:'id'
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     isfilterable:{
         type:DataTypes.BOOLEAN,

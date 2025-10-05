@@ -5,7 +5,8 @@ const {DataTypes}=sequlize;
 const Supplier=DB.define('Supplier',{
     uuid:{
    type:DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,        unique:true,
+        defaultValue: DataTypes.UUIDV4,     
+           unique:true,
         allowNull:false,
                 primaryKey:true,
 

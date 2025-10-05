@@ -17,7 +17,9 @@ const Coupon=DB.define("Coupon",{
         references:{
          model:"products",
          key:'uuid'   
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     discounttype:{
         type:DataTypes.ENUM,

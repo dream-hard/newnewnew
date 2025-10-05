@@ -192,7 +192,6 @@ exports.getRoles = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching roles:", error);
     return res.status(500).json({
       message: "Server error while fetching roles",
       error: error.message
@@ -213,7 +212,6 @@ exports.addroleorstatus=async(req,res)=>{
     res.status(200).json({succes:true,roleandstatus:add});
 
   } catch (error) {
-    console.error("Error adding roles:", error);
     return res.status(400).json({
       message: "Server error while fetching roles",
       error: error.message

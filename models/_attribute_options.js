@@ -27,7 +27,9 @@ const Attribute_option=DB.define("Attribute_option",{
         references:{
             model:"attribute_types",
             key:"id"
-        }
+        },
+        onDelete: 'CASCADE',
+        onUpdate:"CASCADE",
     },
     name:{
         type:DataTypes.STRING(30),

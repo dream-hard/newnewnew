@@ -6,24 +6,27 @@ const Supplier = require("../models/_suppliers");
 
 exports.create = async (req, res) => {
   try {
+    
     const {supplier_id,date_received,total_cost,paid}=req.body;
     const supplier=await Supplier.findByPk(supplier_id);
     if(!supplier)res.status(400).json({error:"SUPPLiER WAS NOT FOUND PLease retry"});
     
 
 
-    const supplier_shipment = await Supplier.create(
+    const supplier_shipment = await Supplier_shipment.create(
         {
             
-            supplier_id,
-            date_received,
-            total_cost,
-            paid
+            supplier_id:supplier_id,
+            date_received:date_received,
+            total_cost:total_cost,
+            paid:paid,
+            currency:req.body.currency,
         }
     );
+
     if(!supplier_shipment)res.status(401).json({error:"retry again please"});
 
-    res.status(201).json(detail);
+    res.status(201).json(supplier_shipment);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -136,11 +139,12 @@ exports.updatewithuuid=async (req,res)=>{
 
 exports.delete = async (req, res) => {
   try {
-    const {id}=req.body;
+    const {id}=req.query;
     const deleted = await Supplier_shipment.destroy({ where: { id: id } });
     if (!deleted) return res.status(404).json({ error: "Not found" });
     res.json({ message: "Deleted successfully" });
   } catch (error) {
+    
     res.status(500).json({ error: error.message });
   }
 };
@@ -295,7 +299,7 @@ exports.searchinshipments = async (req, res) => {
       include: [
         {
           model: Supplier,
-          attributes: ["uuid", "name", "address", "phone"],
+          attributes: ["uuid", "name", "address", "phone_number"],
         },
       ],
       order,

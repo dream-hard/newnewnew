@@ -18,7 +18,9 @@ const Product_attribute=DB.define("Product_attribute",{
         references:{
             model:"products",
             key:"uuid"
-        }
+        },
+        onDelete: 'CASCADE',
+            onUpdate:"CASCADE",
     },
     attribute_option_id:{
         type:DataTypes.INTEGER,
@@ -30,7 +32,9 @@ const Product_attribute=DB.define("Product_attribute",{
         references:{
             model:"attribute_options",
             key:"id"
-        }
+        },
+        onDelete: 'CASCADE',
+            onUpdate:"CASCADE",
     },
     is_filteractive:{
         type:DataTypes.BOOLEAN,
