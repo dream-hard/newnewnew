@@ -458,7 +458,7 @@ exports.addShipmentDetail = async (req, res) => {
       detail: newDetail,
     });
   } catch (err) {
-=    return res.status(500).json({ message: "Server error", error: err.message });
+   return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 

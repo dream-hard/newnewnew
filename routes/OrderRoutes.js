@@ -45,7 +45,22 @@ router.post(
   checkPermission(["admin","super_admin", "Owner"]),
   OrderController.updateOrderStatus
 );
-
+router.post(
+  "/order/update/updateOrderStatustest",
+  varifay,
+  checkPermission(["admin","super_admin", "Owner"]),
+  OrderController.updateOrderStatustest
+);
+router.post("/order/update/paying",
+  varifay,
+  checkPermission(["admin","super_admin", "Owner"]),
+  OrderController.payingorder
+)
+router.post("/order/update/payingtest",
+  varifay,
+  checkPermission(["admin","super_admin", "Owner"]),
+  OrderController.payingordertest
+)
 // ------------------- DELETE -------------------
 router.delete(
   "/order/delete/delete",

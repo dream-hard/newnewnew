@@ -15,5 +15,6 @@ router.post('json/:name/item/add', express.json(),varifay,checkPermission(["admi
 router.post('json/:name/item/remove', express.json(),varifay,checkPermission(["admin","super_admin","Owner"]), ctrl.removeItem);
 router.get('/json/fetch/:fileName', ctrl.fetchProductsFromJsonWithCategoryInfo);
 router.get('/json/check/:fileName',ctrl.checkifexist);
-
+router.put('/json/modify/Adding/:fileName',ctrl.AddingItems);
+router.put('/json/modify/Removing/:fileName',ctrl.RemovingItems);
 module.exports = router;

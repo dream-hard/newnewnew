@@ -296,7 +296,7 @@ exports.getAllNestedCategorieswithallchildren=async(req,res)=>{
 
       const allCats = await Category.findAll({
     where:where,
-    attributes: ['uuid', 'parent_category_id','name', "display_name",'slug'],
+    attributes: ['uuid', 'parent_category_id','name', "display_name",'slug','softdelete'],
     raw: true
   });
 
@@ -399,27 +399,32 @@ exports.justgetall=async(req,res)=>{
 
 exports.addcategory=async(req,res)=>{
   try {
-    const {parent_id,name,description,softdeleted=false,display_name}=req.body;
-    if(!parent_id || !name  ||!display_name)return res.status(400).json({error: "you should send each parent_category_id and name",msg:""});
+    console.log(req.body)
+    const {parent_id=null,name,description,softdelete=false}=req.body;
+    let{display_name=null}=req.body;
+    if( !name  )return res.status(400).json({error: "you should send each parent_category_id and name",msg:""});
+    if(!display_name ||display_name===""){display_name=name};
     const slug=generateSlug(name);
-    const add=await Category.create({parent_category_id:parent_id,name,slug,description,softdeleted,display_name});
-    req.status(200).json({succes:true,msg:"the category was added successfully"});
+    const add=await Category.create({parent_category_id:parent_id,name,slug,description,softdelete,display_name});
+    res.status(200).json({succes:true,msg:"the category was added successfully"});
   } catch (error) {
+    console.log(error)
     res.status(400).json({error:error.message})
   }
 }
 
 exports.updatedcategory=async(req,res)=>{
   try {
-    const {id,parent_id,name,description,softdeleted,display_name}=req.body;
+    const {id,parent_id,name,description,softdelete,display_name}=req.body;
     if(!id)return res.status(400).json({error:"you should send the uuid with the req ",msg:""});
     let optinos={};
-    if(parent_id)optinos.parent_category_id=parent_id;
+    if(parent_id || parent_id===null)optinos.parent_category_id=parent_id;
     if(name){optinos.name=name;optinos.slug=generateSlug(name)}
-    if(description)optinos.description=description;
+    if(description || !description)optinos.description=description;
     if(display_name)optinos.display_name=display_name;
-    if(softdeleted!==null || softdeleted!==undefined)optinos.softdeleted=softdeleted;
+    if(softdelete!==null || softdelete!==undefined)optinos.softdelete=softdelete;
     const [update]=await Category.update(optinos,{where:{uuid:id}});
+ 
     if(!update)return res.status(400).json({error:"the category was not updated please try again",msg:""});
     res.status(200).json({succes:true,msg:"the category was updated successfully"});
   } catch (error) {

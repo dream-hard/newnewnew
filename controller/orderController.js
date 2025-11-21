@@ -96,7 +96,7 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   try {
-    const deleted = await Order.destroy({ where: { uuid: req.body.id } });
+    const deleted = await Order.destroy({ where: { uuid: req.query.id } });
     if (!deleted) return res.status(404).json({ error: "Not found" });
     res.json({ message: "Deleted successfully" });
   } catch (error) {
@@ -128,7 +128,7 @@ const hashPassword = async (password) => {
 exports.placeOrder = async (req, res) => {
 
   let { user_id=null, address_id, custom_address } = req.body;
-  let { phoneNumber, shipping_address, products, note ,currency} = req.body;
+  let { phoneNumber,reqname, shipping_address, products, note ,currency} = req.body;
 
 
 
@@ -167,8 +167,8 @@ exports.placeOrder = async (req, res) => {
               if(!phoneNumber)return res.status(400).json({msg:"",error : "يجب عليك ارسال رقم الهاتف"})
               user = await User.create({
                   phone_number:phoneNumber,
-                  username: "guest_" + phoneNumber,
-                  name:`${phoneNumber}`,
+                  username: "guest_" + reqname,
+                  name:`${reqname}`,
                   role_id:"geust",
                   status_id:"pending",
                   passwordhash:hashpassword,
@@ -262,7 +262,7 @@ exports.updateOrderStatus = async (req, res) => {
         if (!order) return res.status(404).json({ error: "Order not found" });
         let order_update=[];
         
-      if(order_statu==="pending")//pending
+      if(order_statu.statu==="pending")//pending
       {
         [order_update]=order.update({status_id:status_id});
         return res.json({success:true,msg:"succesfull but do not do anything "});
@@ -332,6 +332,7 @@ exports.updateOrderStatus = async (req, res) => {
                 });
 
                 const order_udpate= await order.update({total_amount:new_total_amount});
+                
                 if(product.softdelete===true){
                   await old_porduct_details.update({soft_deleted:true,note});
                 }else{
@@ -627,7 +628,7 @@ let total_amount_paid_infos=[];
             },
             attributes:["exchange_rate"],
             order:[["dateofstart","DESC"]]
-            ,raw:true
+          
           });
       total_amount_paid_infos.push({currency:total_amount_infos.currency,amount:paid*productdetailexg.exchange_rate});
     }else{
@@ -639,6 +640,345 @@ let total_amount_paid_infos=[];
     
   } catch (error) {
             return res.status(500).json({ error: err.message });
+  }
+}
+
+
+exports.updateOrderStatustest = async (req, res) => {
+  const t = await DB.transaction();
+  try {
+    const { orderId, status_id } = req.body;
+    if (!orderId || !status_id) return res.status(400).json({ error: "orderId and status_id required" });
+
+    const order_statu = await Order_statu.findByPk(status_id, { raw: true });
+    if (!order_statu) {
+      await t.rollback();
+      return res.status(404).json({ error: "Order status not found" });
+    }
+
+    const order = await Order.findByPk(orderId);
+    if (!order) {
+      await t.rollback();
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // helper: normalize fields
+    const safeTotalAmount = Array.isArray(order.total_amount) ? order.total_amount : [];
+
+    // handling based on status name
+    const statuName = String(order_statu.statu || "").toLowerCase();
+
+    // ---------- pending -> just set status ----------
+    if (statuName === "pending") {
+      await order.update({ status_id }, { transaction: t });
+      await t.commit();
+      return res.json({ success: true, msg: "Status updated (pending)", order });
+    }
+
+    // ---------- processing: edits + adds + shipping changes ----------
+    if (statuName === "processing") {
+      const {
+        shipping_date, note = "", shipping_address_id, shipping_address,
+        edited_products = [], added_products = [], new_total_currency
+      } = req.body;
+
+      // Update currency if requested (very cautious)
+      if (new_total_currency) {
+        // convert each entry through the exchange rate (pick last known rate)
+        const today = new Date().toISOString().split('T')[0];
+        const converted = [];
+        for (const entry of safeTotalAmount) {
+          if (!entry || typeof entry !== 'object') continue;
+          const base = entry.currency;
+          const amount = Number(entry.amount || 0);
+          if (!base || !new_total_currency || base === new_total_currency) {
+            converted.push({ currency: base, amount });
+            continue;
+          }
+          const er = await Exchange_rate.findOne({
+            where: { base_currency_id: base, target_currency_id: new_total_currency, dateofstart: { [Op.lte]: today } },
+            order: [["dateofstart", "DESC"]],
+            attributes: ["exchange_rate"],
+            raw: true
+          });
+          const rate = er?.exchange_rate ?? 1;
+          converted.push({ currency: new_total_currency, amount: Number((amount * rate).toFixed(2)) });
+        }
+        if (converted.length) {
+          await order.update({ total_amount: converted }, { transaction: t });
+        }
+      }
+
+      // edited_products: update existing order_details
+      // shape expected: [{ id, number, softdelete, currency, all }]
+      if (Array.isArray(edited_products) && edited_products.length) {
+        const today = new Date().toISOString().split('T')[0];
+        for (const p of edited_products) {
+          if (!p || !p.id) continue;
+          const od = await Order_detail.findByPk(p.id, { transaction: t });
+          if (!od) continue;
+
+          // if currency change: adjust cost_per_one using exchange rate
+          if (p.currency && p.currency !== od.currency) {
+            const er = await Exchange_rate.findOne({
+              where: { base_currency_id: od.currency, target_currency_id: p.currency, dateofstart: { [Op.lte]: today } },
+              order: [["dateofstart", "DESC"]],
+              attributes: ["exchange_rate"],
+              raw: true
+            });
+            const rate = er?.exchange_rate ?? 1;
+            await od.update({ currency: p.currency, cost_per_one: Number((od.cost_per_one * rate).toFixed(2)) }, { transaction: t });
+          }
+
+          // if 'all' — remove or softdelete the order_detail
+          if (p.all === true) {
+            if (p.softdelete) {
+              await od.update({ softdeleted: true, note: p.note || note }, { transaction: t });
+            } else {
+              await od.destroy({ transaction: t });
+            }
+            continue;
+          }
+
+          // update quantity if provided
+          if (typeof p.number === "number" && p.number >= 1) {
+            if (p.number !== od.quantity) {
+              const delta = p.number - od.quantity;
+              await od.update({ quantity: p.number }, { transaction: t });
+
+              // update order.total_amount: find numeric entries and adjust roughly by delta * cost_per_one
+              const total_amount_copy = Array.isArray(order.total_amount) ? [...order.total_amount] : [];
+              // attempt to convert cost_per_one to total currency if necessary (skip complex multi-currency logic for brevity)
+              for (let i = 0; i < total_amount_copy.length; i++) {
+                if (!total_amount_copy[i]) continue;
+                // naive approach: if entry.amount>0 adjust by delta*cost_per_one (best-effort)
+                if (total_amount_copy[i].amount && Number(total_amount_copy[i].amount) >= 0) {
+                  total_amount_copy[i].amount = Number((Number(total_amount_copy[i].amount) + (delta * Number(od.cost_per_one))).toFixed(2));
+                }
+              }
+              await order.update({ total_amount: total_amount_copy }, { transaction: t });
+            }
+          }
+        }
+      }
+
+      // added_products: bulk create new order_details and update total
+      if (Array.isArray(added_products) && added_products.length) {
+        let totalsByCurrency = {}; // { currency: total }
+        for (const p of added_products) {
+          // p: { product_id, quantity, cost_per_one, currency }
+          if (!p.product_id || !p.quantity) continue;
+          const currency = p.currency || (safeTotalAmount[0] && safeTotalAmount[0].currency) || "SYP";
+          const cost = Number(p.cost_per_one || 0);
+          totalsByCurrency[currency] = (totalsByCurrency[currency] || 0) + (cost * Number(p.quantity || 0));
+        }
+        // apply totals to order.total_amount (add)
+        const copy = Array.isArray(order.total_amount) ? JSON.parse(JSON.stringify(order.total_amount)) : [];
+        for (const [currency, val] of Object.entries(totalsByCurrency)) {
+          const idx = copy.findIndex(x => x.currency === currency);
+          if (idx >= 0) copy[idx].amount = Number((Number(copy[idx].amount || 0) + val).toFixed(2));
+          else copy.push({ currency, amount: Number(val.toFixed(2)) });
+        }
+        await order.update({ total_amount: copy }, { transaction: t });
+
+        // create Order_detail rows
+        const details = added_products.map(p => ({
+          order_id: order.uuid,
+          product_id: p.product_id,
+          quantity: p.quantity,
+          cost_per_one: p.cost_per_one,
+          currency: p.currency || (safeTotalAmount[0] && safeTotalAmount[0].currency) || "SYP",
+        }));
+        await Order_detail.bulkCreate(details, { transaction: t });
+      }
+
+      // shipping address updates
+      let shipping_id_to_update = order.shipping_address_id;
+      if (shipping_address_id) {
+        // if provided numeric id, set it
+        shipping_id_to_update = shipping_address_id;
+      } else if (shipping_address && typeof shipping_address === "string") {
+        // keep address as note
+        // merge into note
+      }
+
+      const newNote = order.note ? `${order.note} | ${note}` : note;
+      await order.update({ status_id, shipping_address_id: shipping_id_to_update, note: newNote }, { transaction: t });
+
+      // optional shipping table update
+      if (shipping_date) {
+        await Shipping.update({ shipping_date }, { where: { order_id: order.uuid }, transaction: t }).catch(()=>{});
+      }
+
+      await t.commit();
+      return res.json({ success: true, msg: "Order processing updates applied" });
+    } // end processing
+
+    // ---------- shipped ----------
+    if (statuName === "shipped") {
+      const { dlivered_date } = req.body;
+      await order.update({ status_id }, { transaction: t });
+      if (dlivered_date) {
+        await Shipping.update({ dlivered_date }, { where: { order_id: order.uuid }, transaction: t }).catch(()=>{});
+      }
+      await t.commit();
+      return res.json({ success: true, msg: "Order marked shipped" });
+    }
+
+    // ---------- completed: reduce inventory ----------
+    if (statuName === "completed") {
+      // ensure payment matches total_amount
+      const total_amount = Array.isArray(order.total_amount) ? order.total_amount : [];
+      const paid_amount = Array.isArray(order.total_amount_paid) ? order.total_amount_paid : [];
+      // very simple validation: check currency sums equal for first currency entry
+      const firstTotal = total_amount[0] || {};
+      const firstPaid = paid_amount.find(p => p.currency === firstTotal.currency) || {};
+      if (!firstPaid || Number(firstPaid.amount || 0) < Number(firstTotal.amount || 0)) {
+        await t.rollback();
+        return res.status(400).json({ error: "Payment not complete" });
+      }
+
+      // reduce inventory across shipments (oldest shipments first)
+      const productCounts = await Order_detail.findAll({ where: { order_id: order.uuid }, attributes: ["product_id", "quantity"], raw: true, transaction: t });
+
+      for (const { product_id, quantity } of productCounts) {
+        let remaining = Number(quantity);
+        // fetch shipments with quantity>0 oldest first
+        const shipments = await Supplier_shipment_detail.findAll({
+          where: { product_id, quantity: { [Op.gt]: 0 } },
+          order: [['createdAt', 'ASC']],
+          transaction: t,
+          lock: t.LOCK.UPDATE
+        });
+
+        const totalAvailable = shipments.reduce((s, x) => s + Number(x.quantity || 0), 0);
+        if (totalAvailable < remaining) {
+          await t.rollback();
+          return res.status(400).json({ error: `Not enough stock for product ${product_id}` });
+        }
+
+        for (const s of shipments) {
+          if (remaining <= 0) break;
+          const deduct = Math.min(remaining, Number(s.quantity || 0));
+          // atomic update using sequelize.literal
+          await Supplier_shipment_detail.update({ quantity: DB.literal(`quantity - ${deduct}`) }, { where: { id: s.id }, transaction: t });
+          remaining -= deduct;
+        }
+      }
+
+      await order.update({ status_id }, { transaction: t });
+      await t.commit();
+      return res.json({ success: true, msg: "Order completed and stock reduced" });
+    }
+
+    // ---------- cancelled ----------
+    if (statuName === "cancelled") {
+      const { withdelete = false } = req.body;
+      await order.update({ status_id }, { transaction: t });
+      if (withdelete) {
+        await order.destroy({ transaction: t });
+        await t.commit();
+        return res.json({ success: true, msg: "Order cancelled and removed" });
+      } else {
+        await t.commit();
+        return res.json({ success: true, msg: "Order cancelled" });
+      }
+    }
+
+    // ---------- returned ----------
+    if (statuName === "returned") {
+      const { costing = 0, costing_currency = "SYP" } = req.body;
+      // decrease total paid or adjust as appropriate
+      let paidCopy = Array.isArray(order.total_amount_paid) ? JSON.parse(JSON.stringify(order.total_amount_paid)) : [];
+      for (let i = 0; i < paidCopy.length; i++) {
+        if (paidCopy[i].currency === costing_currency) {
+          paidCopy[i].amount = Number((paidCopy[i].amount - Number(costing || 0)).toFixed(2));
+        }
+      }
+      await order.update({ status_id, total_amount_paid: paidCopy }, { transaction: t });
+      await t.commit();
+      return res.json({ success: true, msg: "Order returned" });
+    }
+
+    // ---------- refunded ----------
+    if (statuName === "refunded") {
+      const { recount = false, costing = 0, costing_currency = "SYP" } = req.body;
+      // set total paid amounts to zero (or adjust)
+      let paidCopy = Array.isArray(order.total_amount_paid) ? JSON.parse(JSON.stringify(order.total_amount_paid)) : [];
+      for (let i = 0; i < paidCopy.length; i++) {
+        if (paidCopy[i].currency === costing_currency) {
+          paidCopy[i].amount = Number((paidCopy[i].amount - Number(costing || 0)).toFixed(2));
+        } else {
+          paidCopy[i].amount = 0;
+        }
+      }
+      await order.update({ status_id, total_amount_paid: paidCopy }, { transaction: t });
+
+      if (recount) {
+        // add back quantities from order_details to shipments (increase)
+        const productCounts = await Order_detail.findAll({ where: { order_id: order.uuid }, attributes: ["product_id", "quantity"], raw: true, transaction: t });
+        for (const { product_id, quantity } of productCounts) {
+          await Supplier_shipment_detail.update({ quantity: DB.literal(`quantity + ${quantity}`) }, { where: { product_id }, transaction: t });
+        }
+      }
+
+      await t.commit();
+      return res.json({ success: true, msg: "Order refunded" });
+    }
+
+    await t.rollback();
+    return res.status(400).json({ error: "Status logic not implemented for this status" });
+  } catch (err) {
+    await t.rollback();
+    console.error("updateOrderStatus error:", err);
+    return res.status(500).json({ error: err.message || "Internal error" });
+  }
+};
+
+exports.payingordertest = async (req, res) => {
+  try {
+    let { paid, currency, order_id } = req.body;
+    if (!order_id) return res.status(400).json({ error: "order_id required" });
+    paid = Number(paid || 0);
+
+    const order = await Order.findByPk(order_id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const today = new Date().toISOString().split('T')[0];
+    const totalInfos = Array.isArray(order.total_amount) ? order.total_amount : [];
+    if (!totalInfos.length) return res.status(400).json({ error: "order total_amount missing" });
+
+    // target currency = first total entry currency (simplify)
+    const targetCurrency = totalInfos[0].currency;
+    let newPaid = paid;
+
+    if (currency !== targetCurrency) {
+      const er = await Exchange_rate.findOne({
+        where: { base_currency_id: currency, target_currency_id: targetCurrency, dateofstart: { [Op.lte]: today } },
+        order: [["dateofstart", "DESC"]],
+        attributes: ["exchange_rate"],
+        raw: true
+      });
+      const rate = er?.exchange_rate ?? 1;
+      newPaid = paid * rate;
+    }
+
+    // overwrite total_amount_paid (append or sum logic — here we set/append conservative)
+    let paidArray = Array.isArray(order.total_amount_paid) ? JSON.parse(JSON.stringify(order.total_amount_paid)) : [];
+    const idx = paidArray.findIndex(p => p.currency === targetCurrency);
+    if (idx >= 0) {
+      paidArray[idx].amount = Number((Number(paidArray[idx].amount || 0) + newPaid).toFixed(2));
+    } else {
+      paidArray.push({ currency: targetCurrency, amount: Number(newPaid.toFixed(2)) });
+    }
+
+    order.total_amount_paid = paidArray;
+    await order.save();
+
+    return res.status(200).json({ success: true, msg: `Paid ${newPaid} ${targetCurrency}`, paid: paidArray });
+  } catch (err) {
+    console.error("payingorder error:", err);
+    return res.status(500).json({ error: err.message || "Internal error" });
   }
 }
 exports.softdelete=async (req,res)=>{

@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const { DB: sequelize } = require("../config/config.js");
 const { Ads } = require("../models");
+const { INTEGER } = require("sequelize");
 const orderMapAds = {
   "id-asc": [["id", "ASC"]],
   "id-desc": [["id", "DESC"]],
@@ -139,8 +140,7 @@ exports.getAds = async (req, res) => {
     limit = parseInt(limit);
     const offset = (page - 1) * limit;
     const orderBy = orderMapAds[order] || [["createdAt", "DESC"]];
-    const {count,rows} = await Address.findAndCountAll({limit,offset,order});
-    if(!count ||!rows)return res.status(404).json({error:"the ads was not found"});
+    const {count,rows} = await Ads.findAndCountAll({limit,offset,order:orderBy});
     res.status(200).json({   
       succes:true,
       ads:rows
@@ -160,14 +160,17 @@ exports.filterAds=async(req,res)=>{
     limit = parseInt(limit);
     const offset = (page - 1) * limit;
     const orderBy = orderMapAds[order] || [["createdAt", "DESC"]];
+
     if(id)where.id=id;
     if(name)where.name=name;
     if(title)where.title=title;
     if(link_path)where.link_path=link_path;
     if(photo_path)where.photo_path=photo_path;
-    if(isvalid!==null || isvalid!==undefined)where.isvalid=isvalid;
-    const {count,rows} = await Address.findAndCountAll({where,limit,offset,order});  
+    if(isvalid!==null || isvalid!==undefined)where.isvalid=!!Number(isvalid);
+    console.log(orderBy)
+    const {count,rows} = await Ads.findAndCountAll({where,limit,offset,order:orderBy});  
     if(!count ||!rows)return res.status(404).json({error:"the ads was not found"});
+   
     res.status(200).json({   
       succes:true,
       ads:rows
@@ -260,9 +263,9 @@ exports.updateAd = async (req, res) => {
 
 exports.addad = async (req, res) => {
   try {
-    const { name, title, link_path = "/", isvalid = false } = req.body;
-
-    if (!name) return res.status(400).json({ error: "name is required" });
+    const {  title, link_path = "/", isvalid = false } = req.body;
+    let {name}=req.body;
+    if (!name) name="";
 
     let photo_path = null;
     let disk_filename = null;
@@ -286,7 +289,9 @@ exports.addad = async (req, res) => {
       link_path,
       photo_path,
       disk_filename,
-      isvalid: !!(Number(isvalid) || isvalid)
+      isvalid: (isvalid === undefined || isvalid === null)
+      ? ad.isvalid
+      : (isvalid === true || isvalid === "true" || isvalid === 1 || isvalid === "1")
     });
 
     return res.status(201).json(ad);
@@ -313,11 +318,13 @@ exports.adupdate = async (req, res) => {
       return res.status(404).json({ error: "Ad not found" });
     }
 
-    let { name, title, link_path, isvalid } = req.body;
+    let { name, title, link_path, isvalid} = req.body;
     name = name ?? ad.name;
     title = title ?? ad.title;
     link_path = link_path ?? ad.link_path;
-    isvalid = (isvalid === undefined || isvalid === null) ? ad.isvalid : !!(Number(isvalid) || isvalid);
+    isvalid = (isvalid === undefined || isvalid === null)
+      ? ad.isvalid
+      : (isvalid === true || isvalid === "true" || isvalid === 1 || isvalid === "1");
 
     // If new file uploaded -> delete old disk file (safe) and set new values
     if (req.files && req.files.length > 0) {
@@ -368,10 +375,11 @@ exports.adupdate = async (req, res) => {
 
 exports.remove = async (req, res) => {
   try {
-    const { id } = req.params;
+    const {id} = req.query;
+    console.log(req)
     const ad = await Ads.findByPk(id);
     if (!ad) return res.status(404).json({ error: "Ad not found" });
-
+    
     // delete image file by disk_filename (reliable)
     if (ad.disk_filename) {
       try {

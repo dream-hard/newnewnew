@@ -33,6 +33,7 @@ const Supplier_shipment_details_routes=require("./routes/Supplier_shipment_detai
 const Json_routes=require('./routes/JsonRoutes');
 const Order_routes=require("./routes/OrderRoutes")
 const Order_Status_routes=require('./routes/OrderStatusRoutes')
+const Ads_routes=require('./routes/AdsRoutes');
 const path = require('path');
 
 
@@ -96,6 +97,9 @@ app.use((err, req, res, next) => {
   res.status(403).json({ error: typeof err === "string" ? err : err.message || "Forbidden" });
 });
 
+if(process.env.BASE_URL!==""){
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+}
 // App routes.js
 app.use(Exchange_routes);
 app.use(Currency_routes);
@@ -116,9 +120,11 @@ app.use(Supplier_shipment_details_routes);
 app.use(Json_routes);
 app.use(Order_routes);
 app.use(Order_Status_routes);
+app.use(Ads_routes);
 
 app.get('/pleasetestmerightnow',(req,res)=>{
-  res.send('adsfadsf');
+  res.send('success');
+  res.end();
 })
 
 

@@ -1,4 +1,5 @@
 // controllers/multiJsonController.js
+const { writeFile } = require('fs/promises');
 const { Product, Currency, Product_image, Category } = require('../models');
 const { readJsonFile, writeJsonFile, withFileLock, filePathFor } = require('../utils/multiJsonStore');
 const path = require('path')/**
@@ -109,13 +110,12 @@ exports.fetchProductsFromJsonWithCategoryInfo = async (req, res) => {
           const vals = Object.values(item);
           return vals.length ? vals[0] : null;
         }).filter(Boolean);
-
         // fetch products in a single query
         const products = ids.length
           ? await Product.findAll({ where: { uuid: ids ,softdelete:false},include:[
             {model:Category },
             {model: Currency, attributes: ["currency_iso", "symbol"] },
-            {model: Product_image, attributes: ["filename" ],where:{image_type:"main"}}] })
+            {model: Product_image,required:false, attributes: ["filename" ],where:{image_type:"main"}}] })
           : [];
 
         // reorder according to ids
@@ -136,17 +136,22 @@ exports.fetchProductsFromJsonWithCategoryInfo = async (req, res) => {
 
       // flat object: keys are uuids or keys->values: we will fetch by keys
           const ids = Object.values(data);
+
+
           const products = ids.length
-          ? await Product.findAll({ where: { uuid: ids ,softdelete:false},include:[
+          ? await Product.findAll({ where: { uuid: [...ids] ,softdelete:false},include:[
             {model:Category,attributes:["slug","display_name"]},
             {model: Currency, attributes: ["currency_iso", "symbol"] },
-            {model: Product_image, attributes: ["filename" ],where:{image_type:"main"}}] })
+            {model: Product_image,required:false, attributes: ["filename" ],where:{image_type:"main"}}] })
           : [];
 
-        
+          
       // map each key -> product (if exists)
           const byId = new Map(products.map(p => [String(p.uuid), p]));
+   
+
         const orderedProducts = ids.map(id => byId.get(String(id))).filter(Boolean);
+  
       result['products']=orderedProducts;
       
     }
@@ -306,5 +311,124 @@ exports.removeItem = async (req, res) => {
     res.json({ ok: true, name, ...updated });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+function objectsAreEqual(obj1, obj2) {
+const keys1 = Object.keys(obj1);
+const keys2 = Object.keys(obj2);
+
+if (keys1.length !== keys2.length) return false;
+
+return keys1.every(key => obj2.hasOwnProperty(key));
+}
+function deepEqual(a,b){
+    if (typeof a === "object" && typeof b === "object") {
+    const ka = Object.keys(a);
+    const kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    // order doesn't matter
+    return ka.every(k => Object.prototype.hasOwnProperty.call(b, k));
+  }
+}
+exports.AddingItems=async (req,res)=>{
+  try {
+    const name = req.params.fileName;
+    let {items}=req.body;
+
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ ok: false, error: 'fileName required in route' });
+    }
+
+
+    const data = await readJsonFile(name, {});
+    const values = Object.values(data);
+    const hasCategories = values.length > 0 && values.every(v => Array.isArray(v));
+
+    if (hasCategories) {
+      let copy=JSON.parse(JSON.stringify(data));;
+
+      for (const [categorykey,newarr] of Object.entries(items)){
+        if(!copy.hasOwnProperty(categorykey)){
+          copy[categorykey]=newarr.slice();
+        }else{
+          newarr.forEach(obj=>{
+            if(!copy[categorykey].some(item=>objectsAreEqual(item,obj))){
+              copy[categorykey].push(obj)
+            }
+          })
+        }
+      }
+          const filePath=path.join(__dirname,"../data/",name+'.json');
+       
+          await writeFile(filePath,JSON.stringify(copy,null,2));
+    } else {
+        let copy = JSON.parse(JSON.stringify(data));
+      // flat object: keys are uuids or keys->values: we will fetch by keys
+          Object.entries(items).forEach(([key,value])=>{
+            if(!copy.hasOwnProperty(key)){
+              copy[key]=value;
+            }
+          });
+
+          const filePath=path.join(__dirname,"../data/",name+'.json');
+
+          await writeFile(filePath,JSON.stringify(copy,null,2));
+    }
+
+    return res.status(200).json({success:true})
+    
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+exports.RemovingItems = async (req, res) => {
+  try {
+    const name = req.params.fileName;
+    let { items ,reqcategory} = req.body; // structure depends on your JSON
+
+    if (!name || typeof name !== "string") {
+      return res.status(400).json({ ok: false, error: "fileName required in route" });
+    }
+
+    const fileName = name;
+    const data = await readJsonFile(name, {});
+    const clone = typeof structuredClone === "function"
+      ? structuredClone(data)
+      : JSON.parse(JSON.stringify(data));
+
+    const values = Object.values(clone);
+    const hasCategories = values.length > 0 && values.every(v => Array.isArray(v));
+
+    if (hasCategories) {
+      if(reqcategory===''||reqcategory===null ||reqcategory===undefined )
+      for (const [categoryKey, removeArr] of Object.entries(items)) {
+        if (clone[categoryKey] && Array.isArray(clone[categoryKey])) {
+          clone[categoryKey] = clone[categoryKey].filter(item =>
+            !removeArr.some(obj => deepEqual(obj, item))
+          );
+        }
+      }
+      else{
+        Object.keys(clone).forEach(key=>{
+          if(key===reqcategory)delete clone[reqcategory];
+        })
+      }
+    } else {
+      Object.keys(items).forEach(key => {
+        if (clone.hasOwnProperty(key)) {
+          delete clone[key];
+        }
+      });
+    }
+          const filePath=path.join(__dirname,"../data/",fileName+'.json');
+    
+          await writeFile(filePath,JSON.stringify(clone,null,2));
+    return res.status(200).json({ success: true });
+
+  } catch (error) {
+  
+    return res.status(500).json({ error: error.message || "Internal server error" });
   }
 };

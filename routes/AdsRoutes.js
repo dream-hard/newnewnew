@@ -2,30 +2,27 @@
 const express = require("express");
 const router = express.Router();
 const adsCtrl = require("../controller/adsController");
-const { upload, autoProcessImages } = require("../middlewares/uploadAdsMiddleware");
-adsCtrl.addad
-adsCtrl.adupdate
-adsCtrl.remove
-adsCtrl.filterAds
-adsCtrl.searchinAds
-adsCtrl.toggleValid
-adsCtrl.
+const { upload, autoProcessImages } = require('../midelware/uploadAdsMiddleware');
+const { varifay } = require("../midelware/varifay");
+const { checkPermission } = require("../midelware/checkpermission");
+
 // create ad (field name "images" or "image")
-router.post("/", upload.array("images", 1), autoProcessImages, adsCtrl.create);
-
-// get all
-router.get("/", adsCtrl.getAll);
-
-// get by id
-router.get("/:id", adsCtrl.getById);
-
-// update (allow replacing image)
-router.put("/:id", upload.array("images", 1), autoProcessImages, adsCtrl.update);
-
-// delete
-router.delete("/:id", adsCtrl.remove);
 
 // toggle validity
-router.post("/:id/toggle-valid", adsCtrl.toggleValid);
+router.post("/banners/toggle-valid/:id",varifay,checkPermission(['admin','super_admin','Owner']), adsCtrl.toggleValid);
+
+router.get('/banners/getAds',adsCtrl.getAds);
+router.get('/banners/filterAds',adsCtrl.filterAds);
+router.post('/banners/getonead',varifay,checkPermission(['admin','super_admin','Owner']),adsCtrl.getAd);
+router.get('/banners/searchinAds',varifay,adsCtrl.searchinAds);
+
+
+router.post('/banners/update/softdelete',varifay,checkPermission(['super_admin',"Owner"]),adsCtrl.softdelete);
+
+router.post('/banners/create/addad',varifay,checkPermission(['super_admin',"Owner"]),upload.array('files',1),autoProcessImages,adsCtrl.addad);
+router.patch('/banners/update/adupdate',varifay,checkPermission(['super_admin','Owner']),upload.array('files',1),autoProcessImages,adsCtrl.adupdate);
+router.patch('/banners/update/updateAd',varifay,checkPermission(['super_admin','Owner']),upload.array('files',1),autoProcessImages,adsCtrl.updateAd);
+router.delete('/banners/delete/remove',varifay,checkPermission(['super_admin','Owner']),adsCtrl.remove);
+router.delete('/banners/delete/deleteAd',varifay,checkPermission(['super_admin','Owner']),adsCtrl.deleteAd);
 
 module.exports = router;

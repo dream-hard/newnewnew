@@ -18,7 +18,7 @@ const Ads=DB.define("Ads",{
         type:DataTypes.STRING,
         allowNull:true,
         validate:{
-            notEmpty:true,
+         
         }
     },
     link_path:{

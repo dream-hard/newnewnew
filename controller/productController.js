@@ -739,7 +739,6 @@ exports.updateProductWithImages = async (req, res) => {
 
         // 2️⃣ Update product fields if provided
         const slug = title ? generateSlug(title) : product.slug;
-
         await product.update({
             category_id: cat || product.category_id,
             user_id: user || product.user_id,
@@ -829,7 +828,7 @@ exports.updateProductWithImages = async (req, res) => {
 exports.createProductWithImages = async (req, res) => {
   try {
     let {
-      category_id, user="08a46d31-6ddc-437d-813f-5f68d3b53a4e", status_id, condition_id, currency, title, quantity,
+      category_id, user=req.user.id, status_id, condition_id, currency, title, quantity,
       active_name, active_number, active_prcie, available, featured,
       upcoming, negotiable, warranty, warranty_peroid, latest,
       discount, price, original_price, metadata,description,attribute_option_ids=[]
@@ -909,6 +908,8 @@ exports.createProductWithImages = async (req, res) => {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     }
+        const slug=generateSlug(req.body.title)
+
     res.status(400).json({ slug:req.body.title,sss:slug,error: error.message });
   }
 };
